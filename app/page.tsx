@@ -1,44 +1,1921 @@
 "use client";
-import {FormEvent,useEffect,useMemo,useState} from "react";import {launchMarket,priceSources} from "../lib/sources";import {CatalogProduct,findCatalogProducts} from "../lib/product-catalog";import {fuzzyMatch} from "../lib/search";
-type Tab="inicio"|"guardados"|"listas"|"alertas"|"perfil"; type Offer={store:string;price:number;distance?:number;delivery:boolean;shipping?:number;method?:"pickup"|"local"|"national";eta?:string;seller?:string;marketplace?:boolean;minimumOrder?:number;condition?:string}; type Item={id:number|string;emoji:string;name:string;brand:string;detail:string;category:"Mercado"|"Hogar";old:number;offers:Offer[];persisted?:boolean};type ProductDraft={name:string;brand:string;category:"Mercado"|"Hogar";presentation:string;barcode:string;model:string;emoji:string};type Account={name:string;email:string}|null;
-const seed:Item[]=[
- {id:1,emoji:"☕",name:"Café torrado",brand:"Pilão",detail:"500 g",category:"Mercado",old:27.9,offers:[{store:"Carrefour",price:22.49,distance:1.8,delivery:true,shipping:6.9,method:"local",eta:"Hoy o mañana",minimumOrder:35},{store:"Assaí",price:23.9,distance:3.2,delivery:false,shipping:0,method:"pickup",eta:"Retiro hoy"},{store:"Pão de Açúcar",price:25.19,distance:.9,delivery:true,shipping:8.9,method:"local",eta:"Hoy"}]},
- {id:2,emoji:"🧻",name:"Papel higiénico",brand:"Neve",detail:"12 rollos",category:"Mercado",old:31.9,offers:[{store:"Atacadão",price:24.9,distance:4.1,delivery:false,shipping:0,method:"pickup",eta:"Retiro hoy"},{store:"Carrefour",price:27.49,distance:1.8,delivery:true,shipping:6.9,method:"local",eta:"1 día"}]},
- {id:3,emoji:"📺",name:"Smart TV 55” 4K",brand:"Samsung",detail:"Crystal UHD",category:"Hogar",old:2699,offers:[{store:"Magazine Luiza",price:2299,delivery:true,shipping:0,method:"national",eta:"3 a 6 días",seller:"Magalu"},{store:"Amazon",price:2379,delivery:true,shipping:0,method:"national",eta:"2 a 5 días",seller:"Amazon Brasil"},{store:"Mercado Livre",price:2449,delivery:true,shipping:39.9,method:"national",eta:"4 a 8 días",seller:"Loja Parceira",marketplace:true,condition:"Nuevo"}]}
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { launchMarket, priceSources } from "../lib/sources";
+import { CatalogProduct, findCatalogProducts } from "../lib/product-catalog";
+import { fuzzyMatch } from "../lib/search";
+import { deleteUser } from "firebase/auth";
+import { firebaseAuth } from "../lib/firebase-client";
+type Tab = "inicio" | "guardados" | "listas" | "alertas" | "perfil";
+type Offer = {
+  store: string;
+  price: number;
+  distance?: number;
+  delivery: boolean;
+  shipping?: number;
+  method?: "pickup" | "local" | "national";
+  eta?: string;
+  seller?: string;
+  marketplace?: boolean;
+  minimumOrder?: number;
+  condition?: string;
+};
+type Item = {
+  id: number | string;
+  emoji: string;
+  name: string;
+  brand: string;
+  detail: string;
+  category: "Mercado" | "Hogar";
+  old: number;
+  offers: Offer[];
+  persisted?: boolean;
+};
+type ProductDraft = {
+  name: string;
+  brand: string;
+  category: "Mercado" | "Hogar";
+  presentation: string;
+  barcode: string;
+  model: string;
+  emoji: string;
+};
+type Account = { name: string; email: string } | null;
+const seed: Item[] = [
+  {
+    id: 1,
+    emoji: "☕",
+    name: "Café torrado",
+    brand: "Pilão",
+    detail: "500 g",
+    category: "Mercado",
+    old: 27.9,
+    offers: [
+      {
+        store: "Carrefour",
+        price: 22.49,
+        distance: 1.8,
+        delivery: true,
+        shipping: 6.9,
+        method: "local",
+        eta: "Hoy o mañana",
+        minimumOrder: 35,
+      },
+      {
+        store: "Assaí",
+        price: 23.9,
+        distance: 3.2,
+        delivery: false,
+        shipping: 0,
+        method: "pickup",
+        eta: "Retiro hoy",
+      },
+      {
+        store: "Pão de Açúcar",
+        price: 25.19,
+        distance: 0.9,
+        delivery: true,
+        shipping: 8.9,
+        method: "local",
+        eta: "Hoy",
+      },
+    ],
+  },
+  {
+    id: 2,
+    emoji: "🧻",
+    name: "Papel higiénico",
+    brand: "Neve",
+    detail: "12 rollos",
+    category: "Mercado",
+    old: 31.9,
+    offers: [
+      {
+        store: "Atacadão",
+        price: 24.9,
+        distance: 4.1,
+        delivery: false,
+        shipping: 0,
+        method: "pickup",
+        eta: "Retiro hoy",
+      },
+      {
+        store: "Carrefour",
+        price: 27.49,
+        distance: 1.8,
+        delivery: true,
+        shipping: 6.9,
+        method: "local",
+        eta: "1 día",
+      },
+    ],
+  },
+  {
+    id: 3,
+    emoji: "📺",
+    name: "Smart TV 55” 4K",
+    brand: "Samsung",
+    detail: "Crystal UHD",
+    category: "Hogar",
+    old: 2699,
+    offers: [
+      {
+        store: "Magazine Luiza",
+        price: 2299,
+        delivery: true,
+        shipping: 0,
+        method: "national",
+        eta: "3 a 6 días",
+        seller: "Magalu",
+      },
+      {
+        store: "Amazon",
+        price: 2379,
+        delivery: true,
+        shipping: 0,
+        method: "national",
+        eta: "2 a 5 días",
+        seller: "Amazon Brasil",
+      },
+      {
+        store: "Mercado Livre",
+        price: 2449,
+        delivery: true,
+        shipping: 39.9,
+        method: "national",
+        eta: "4 a 8 días",
+        seller: "Loja Parceira",
+        marketplace: true,
+        condition: "Nuevo",
+      },
+    ],
+  },
 ];
-const money=(n:number)=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(n);
-function AdminPanel(){type Data={stores:{id:string;name:string;segment:string;integration_status:string;enabled:number}[];jobs:{id:string;status:string;failed_count:number;pending_count:number}[];errors:{message:string;store:string}[];reports:{id:string;product:string;reason:string}[];duplicates:{name_key:string;brand_key:string;count:number}[]};const[data,setData]=useState<Data|null>(null),[open,setOpen]=useState(false);const load=()=>fetch("/api/admin").then(r=>r.ok?r.json():null).then(setData);useEffect(()=>{load()},[]);if(!data)return null;async function toggle(s:Data["stores"][number]){await fetch("/api/admin",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({storeId:s.id,enabled:!s.enabled})});load()}return <section className="admin-panel"><button className="admin-head" onClick={()=>setOpen(!open)}><div><span>SOLO ADMINISTRACIÓN</span><strong>Estado del sistema</strong><small>{data.stores.length} fuentes · {data.errors.length} errores · {data.reports.length} reportes</small></div><b>{open?"⌃":"⌄"}</b></button>{open&&<div className="admin-body"><div className="admin-stats"><div><strong>{data.jobs[0]?.pending_count||0}</strong><span>Pendientes</span></div><div><strong>{data.errors.length}</strong><span>Errores</span></div><div><strong>{data.duplicates.length}</strong><span>Duplicados</span></div></div><h4>Fuentes y conectores</h4><div className="admin-sources">{data.stores.map(s=><article key={s.id}><i className={s.integration_status}/><div><strong>{s.name}</strong><span>{s.segment} · {s.integration_status}</span></div><button onClick={()=>toggle(s)}>{s.enabled?"Activa":"Pausada"}</button></article>)}</div>{data.reports.length>0&&<><h4>Reportes abiertos</h4>{data.reports.map(r=><p key={r.id}>{r.product} · {r.reason}</p>)}</>}{data.duplicates.length>0&&<><h4>Posibles duplicados</h4>{data.duplicates.map(d=><p key={d.name_key+d.brand_key}>{d.name_key} · {d.brand_key} ({d.count})</p>)}</>}</div>}</section>}
-function ShoppingLists({items}:{items:Item[]}){type L={id:string;name:string;items:{id:string;productId:string;name:string;brand:string;quantity:number;purchased:boolean}[]};const[lists,setLists]=useState<L[]>([]),[name,setName]=useState(""),[selected,setSelected]=useState(""),[product,setProduct]=useState(""),[result,setResult]=useState<{ready:boolean;missing?:string[];oneStore?:{stores:string[];total:number};split?:{stores:string[];total:number}}|null>(null);const load=()=>fetch("/api/lists").then(r=>r.ok?r.json():{lists:[]}).then(d=>{setLists(d.lists);if(!selected&&d.lists[0])setSelected(d.lists[0].id)});useEffect(()=>{load()},[]);async function create(e:FormEvent){e.preventDefault();await fetch("/api/lists",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({name})});setName("");load()}async function addItem(){if(!selected||!product)return;await fetch(`/api/lists/${selected}/items`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({productId:product,quantity:1})});setProduct("");load()}async function optimize(){const r=await fetch(`/api/lists/${selected}/optimize`);setResult(await r.json())}const active=lists.find(l=>l.id===selected);return <section className="inner"><Title over="PLANIFICÁ TU COMPRA" title="Mis listas" sub="Compará una tienda o hasta tres"/><form className="new-list" onSubmit={create}><input required value={name} onChange={e=>setName(e.target.value)} placeholder="Ej. Compra semanal"/><button>＋ Crear</button></form>{lists.length>0&&<><div className="list-tabs">{lists.map(l=><button key={l.id} className={selected===l.id?"active":""} onClick={()=>{setSelected(l.id);setResult(null)}}>{l.name}</button>)}</div><div className="add-list-item"><select value={product} onChange={e=>setProduct(e.target.value)}><option value="">Agregar producto guardado</option>{items.map(i=><option key={i.id} value={String(i.id)}>{i.name} · {i.brand}</option>)}</select><button onClick={addItem}>Agregar</button></div><div className="list-items">{active?.items.map(i=><article key={i.id}><i>{i.purchased?"✓":"○"}</i><div><strong>{i.name}</strong><span>{i.brand} · Cantidad {i.quantity}</span></div></article>)}</div><button className="optimize" onClick={optimize}>✦ Calcular mejor combinación</button>{result&&<div className="optimization">{!result.ready?<><strong>Faltan precios reales</strong><p>{result.missing?.join(", ")||"La lista todavía no tiene ofertas comparables."}</p></>:<>{result.oneStore&&<article><span>Todo en una tienda</span><strong>{money(result.oneStore.total)}</strong><small>{result.oneStore.stores.join(", ")}</small></article>}{result.split&&<article className="best"><span>Dividir la compra</span><strong>{money(result.split.total)}</strong><small>{result.split.stores.join(" + ")}</small></article>}</>}</div>}</>}{!lists.length&&<div className="empty-alerts">Creá tu primera lista para comenzar.</div>}</section>}
-export default function Home(){
- const [tab,setTab]=useState<Tab>("inicio"),[items,setItems]=useState(seed),[filter,setFilter]=useState<"Todos"|"Mercado"|"Hogar">("Todos"),[radius,setRadius]=useState(10),[location,setLocation]=useState("São Paulo, SP"),[locationOpen,setLocationOpen]=useState(false),[addOpen,setAddOpen]=useState(false),[selected,setSelected]=useState<Item|null>(null),[toast,setToast]=useState(""),[locating,setLocating]=useState(false),[account,setAccount]=useState<Account>(null),[query,setQuery]=useState(""),[deliveryOnly,setDeliveryOnly]=useState(false),[availableOnly,setAvailableOnly]=useState(false),[sort,setSort]=useState<"total"|"distance"|"discount">("total");
- const visible=useMemo(()=>items.filter(i=>(filter==="Todos"||i.category===filter)&&fuzzyMatch(query,`${i.name} ${i.brand} ${i.detail}`)&&(!availableOnly||i.offers.length>0)&&(!deliveryOnly||i.offers.some(o=>o.delivery))).sort((a,b)=>{const best=(x:Item)=>x.offers.length?Math.min(...x.offers.map(o=>o.price+(o.shipping||0))):Number.MAX_SAFE_INTEGER;if(sort==="distance")return Math.min(...a.offers.map(o=>o.distance||999))-Math.min(...b.offers.map(o=>o.distance||999));if(sort==="discount")return (b.old-best(b))-(a.old-best(a));return best(a)-best(b)}),[items,filter,query,deliveryOnly,availableOnly,sort]);
- const notify=(m:string)=>{setToast(m);setTimeout(()=>setToast(""),3000)};
- useEffect(()=>{Promise.all([fetch("/api/products").then(r=>r.ok?r.json():{products:[]}),fetch("/api/preferences").then(r=>r.ok?r.json():{}),fetch("/api/me").then(r=>r.json())]).then(([p,pref,me])=>{const saved=(p.products||[]).map((x:{id:string;name:string;brand:string|null;description:string|null;model:string|null;attributes?:{category?:string}})=>({id:x.id,emoji:x.attributes?.category==="Hogar"?"🏠":"🛒",name:x.name,brand:x.brand||"Sin marca",detail:x.description||x.model||"Presentación confirmada",category:x.attributes?.category==="Hogar"?"Hogar":"Mercado",old:0,offers:[],persisted:true} as Item));setItems([...saved,...seed]);if(pref.preferences){setLocation(`${pref.preferences.city||"São Paulo"}, ${pref.preferences.region||"SP"}`);setRadius(pref.preferences.radiusKm||10)}if(me.user)setAccount({name:me.user.name,email:me.user.email})}).catch(()=>notify("No pudimos cargar tus datos guardados"))},[]);
- useEffect(()=>{const search=(e:Event)=>setQuery((e as CustomEvent<string>).detail),options=(e:Event)=>{const d=(e as CustomEvent<{delivery?:boolean;available?:boolean;sort?:"total"|"distance"|"discount"}>).detail;if(d.delivery!==undefined)setDeliveryOnly(d.delivery);if(d.available!==undefined)setAvailableOnly(d.available);if(d.sort)setSort(d.sort)};window.addEventListener("precio-search",search);window.addEventListener("precio-options",options);return()=>{window.removeEventListener("precio-search",search);window.removeEventListener("precio-options",options)}},[]);
- useEffect(()=>{if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});const offline=()=>notify("Estás sin conexión. Mostramos la última versión disponible."),online=()=>notify("Conexión recuperada");window.addEventListener("offline",offline);window.addEventListener("online",online);return()=>{window.removeEventListener("offline",offline);window.removeEventListener("online",online)}},[]);
- function detect(){setLocating(true);if(!navigator.geolocation){setLocating(false);notify("Tu navegador no permite usar ubicación");return}navigator.geolocation.getCurrentPosition(async position=>{try{const response=await fetch(`/api/geocode?lat=${position.coords.latitude}&lon=${position.coords.longitude}`),data=await response.json();if(!response.ok)throw new Error(data.error);const place=data.location;savePreferences(place.city||"Ubicación actual",radius,{latitude:position.coords.latitude,longitude:position.coords.longitude,postalCode:place.postalCode});notify("Ubicación precisa guardada")}catch{setLocating(false);notify("No pudimos reconocer la dirección")}},()=>{setLocating(false);notify("No pudimos acceder. Podés elegirla manualmente.")})}
- async function add(product:ProductDraft){const response=await fetch("/api/products",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(product)});if(!response.ok){notify("No pudimos guardar el producto");return}const {product:row}=await response.json();setItems(v=>[{id:row.id,emoji:product.emoji,name:product.name,brand:product.brand,detail:product.presentation||product.model||"Presentación confirmada",category:product.category,old:0,offers:[],persisted:true},...v]);setAddOpen(false);setTab("guardados");notify("Producto guardado en tu perfil.")}
- async function remove(item:Item){if(!item.persisted)return;const response=await fetch(`/api/products/${item.id}`,{method:"DELETE"});if(response.ok){setItems(v=>v.filter(x=>x.id!==item.id));notify("Producto eliminado")}}
- function savePreferences(l:string,r:number,geo?:{latitude:number;longitude:number;postalCode?:string}){setLocation(l);setRadius(r);setLocationOpen(false);setLocating(false);fetch("/api/preferences",{method:"PUT",headers:{"content-type":"application/json"},body:JSON.stringify({city:l.replace(/,\s*SP$/i,""),radiusKm:r,...geo})}).then(x=>x.ok?notify("Zona guardada en tu perfil"):notify("No pudimos guardar la zona"))}
- return <div className="app"><header className="topbar"><div className="logo"><span>p</span><strong>precio</strong><b>cerca</b></div><button className="place" onClick={()=>setLocationOpen(true)}><i>⌖</i><span><small>Comprando en</small>{location}</span><b>⌄</b></button><button className="avatar" onClick={()=>setTab("perfil")} aria-label="Abrir perfil">{account?.name?.[0]?.toUpperCase()||"?"}</button></header><main>
- {tab==="inicio"&&<><section className="hero"><div className="eyebrow">AHORRÁ CERCA TUYO</div><h1>¿Qué precio<br/>querés comparar?</h1><p>Guardá un producto y te mostramos dónde conviene comprarlo.</p><button className="add-main" onClick={()=>setAddOpen(true)}><span>＋</span><div><strong>Agregar producto</strong><small>Nombre, marca y listo</small></div><b>›</b></button></section><section className="quick"><button onClick={()=>{setFilter("Mercado");document.getElementById("ofertas")?.scrollIntoView({behavior:"smooth"})}}><span>🛒</span><div><strong>Supermercado</strong><small>Ofertas a {radius} km</small></div><b>›</b></button><button onClick={()=>{setFilter("Hogar");document.getElementById("ofertas")?.scrollIntoView({behavior:"smooth"})}}><span>🏠</span><div><strong>Casa y electro</strong><small>Envíos nacionales</small></div><b>›</b></button></section><section className="section" id="ofertas"><div className="section-head"><div><span>✦</span><h2>Mejores ofertas</h2><p>Actualizadas hoy a las 08:00</p></div><button onClick={()=>setTab("guardados")}>Ver todo</button></div><Filters value={filter} set={setFilter}/><div className="cards">{visible.map(i=><Card key={i.id} item={i} radius={radius} open={()=>setSelected(i)}/>)}</div></section><section className="how"><span>🔔</span><div><strong>Vos guardás. Nosotros seguimos.</strong><p>Revisamos los precios cada día y te avisamos cuando aparece una buena oferta.</p></div></section></>}
- {tab==="guardados"&&<section className="inner"><Title over="TUS SEGUIMIENTOS" title="Guardados" sub={`${items.filter(i=>i.persisted).length} productos personales · actualización diaria`} action={()=>setAddOpen(true)}/><Filters value={filter} set={setFilter}/><div className="cards saved">{visible.map(i=><Card key={i.id} item={i} radius={radius} open={()=>setSelected(i)} remove={i.persisted?()=>remove(i):undefined}/>)}</div></section>}
- {tab==="listas"&&<ShoppingLists items={items.filter(i=>i.persisted)}/>} 
- {tab==="alertas"&&<AlertsCenter items={items.filter(i=>i.persisted)}/>} 
- {tab==="perfil"&&<section className="inner"><Title over="TUS PREFERENCIAS" title="Mi cuenta" sub="Tus productos sincronizados y tu zona"/><AccountCard account={account}/><div className="settings"><button onClick={()=>setLocationOpen(true)}><span>⌖</span><div><strong>Ubicación</strong><small>{location}</small></div><b>›</b></button><div className="range"><div><strong>Radio de búsqueda</strong><b>{radius} km</b></div><input aria-label="Radio" type="range" min="1" max="50" value={radius} onChange={e=>setRadius(+e.target.value)}/><footer><span>1 km</span><span>50 km</span></footer></div><div className="note">Para hogar también mostramos tiendas con envío nacional, aunque estén fuera de tu radio.</div></div><NearbyCoverage/><DailyStatus/><SourceRegistry/><AdminPanel/></section>}
- </main><nav className="bottom-nav">{([{id:"inicio",icon:"⌂",label:"Inicio"},{id:"guardados",icon:"♡",label:"Guardados"},{id:"listas",icon:"☷",label:"Listas"},{id:"alertas",icon:"♢",label:"Alertas"},{id:"perfil",icon:"○",label:"Mi zona"}]as const).map(n=><button key={n.id} className={tab===n.id?"active":""} onClick={()=>setTab(n.id)}><i>{n.icon}</i><span>{n.label}</span>{n.id==="alertas"&&<b/>}</button>)}</nav>
- {addOpen&&<Add close={()=>setAddOpen(false)} save={add}/>} {selected&&<Offers item={selected} radius={radius} close={()=>setSelected(null)}/>} {locationOpen&&<Location location={location} radius={radius} locating={locating} detect={detect} close={()=>setLocationOpen(false)} save={savePreferences}/>} {toast&&<div className="toast">✓ {toast}</div>}</div>
+const money = (n: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
+    n,
+  );
+function AdminPanel() {
+  type Data = {
+    stores: {
+      id: string;
+      name: string;
+      segment: string;
+      integration_status: string;
+      enabled: number;
+    }[];
+    jobs: {
+      id: string;
+      status: string;
+      failed_count: number;
+      pending_count: number;
+    }[];
+    errors: { message: string; store: string }[];
+    reports: { id: string; product: string; reason: string }[];
+    duplicates: { name_key: string; brand_key: string; count: number }[];
+  };
+  const [data, setData] = useState<Data | null>(null),
+    [open, setOpen] = useState(false);
+  const load = () =>
+    fetch("/api/admin")
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setData);
+  useEffect(() => {
+    load();
+  }, []);
+  if (!data) return null;
+  async function toggle(s: Data["stores"][number]) {
+    await fetch("/api/admin", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ storeId: s.id, enabled: !s.enabled }),
+    });
+    load();
+  }
+  return (
+    <section className="admin-panel">
+      <button className="admin-head" onClick={() => setOpen(!open)}>
+        <div>
+          <span>SOLO ADMINISTRACIÓN</span>
+          <strong>Estado del sistema</strong>
+          <small>
+            {data.stores.length} fuentes · {data.errors.length} errores ·{" "}
+            {data.reports.length} reportes
+          </small>
+        </div>
+        <b>{open ? "⌃" : "⌄"}</b>
+      </button>
+      {open && (
+        <div className="admin-body">
+          <div className="admin-stats">
+            <div>
+              <strong>{data.jobs[0]?.pending_count || 0}</strong>
+              <span>Pendientes</span>
+            </div>
+            <div>
+              <strong>{data.errors.length}</strong>
+              <span>Errores</span>
+            </div>
+            <div>
+              <strong>{data.duplicates.length}</strong>
+              <span>Duplicados</span>
+            </div>
+          </div>
+          <h4>Fuentes y conectores</h4>
+          <div className="admin-sources">
+            {data.stores.map((s) => (
+              <article key={s.id}>
+                <i className={s.integration_status} />
+                <div>
+                  <strong>{s.name}</strong>
+                  <span>
+                    {s.segment} · {s.integration_status}
+                  </span>
+                </div>
+                <button onClick={() => toggle(s)}>
+                  {s.enabled ? "Activa" : "Pausada"}
+                </button>
+              </article>
+            ))}
+          </div>
+          {data.reports.length > 0 && (
+            <>
+              <h4>Reportes abiertos</h4>
+              {data.reports.map((r) => (
+                <p key={r.id}>
+                  {r.product} · {r.reason}
+                </p>
+              ))}
+            </>
+          )}
+          {data.duplicates.length > 0 && (
+            <>
+              <h4>Posibles duplicados</h4>
+              {data.duplicates.map((d) => (
+                <p key={d.name_key + d.brand_key}>
+                  {d.name_key} · {d.brand_key} ({d.count})
+                </p>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+    </section>
+  );
 }
-function Title({over,title,sub,action}:{over:string;title:string;sub:string;action?:()=>void}){return <div className="title"><div><p>{over}</p><h1>{title}</h1><span>{sub}</span></div>{action&&<button onClick={action}>＋</button>}</div>}
-function Filters({value,set}:{value:string;set:(v:"Todos"|"Mercado"|"Hogar")=>void}){const[q,setQ]=useState(""),[delivery,setDelivery]=useState(false),[available,setAvailable]=useState(false),[order,setOrder]=useState("total");function emit(detail:object){window.dispatchEvent(new CustomEvent("precio-options",{detail}))}return <div className="search-tools"><div className="inline-search"><span>⌕</span><input value={q} onChange={e=>{setQ(e.target.value);window.dispatchEvent(new CustomEvent("precio-search",{detail:e.target.value}))}} placeholder="Buscar producto, marca o tamaño"/>{q&&<button onClick={()=>{setQ("");window.dispatchEvent(new CustomEvent("precio-search",{detail:""}))}}>×</button>}</div><div className="filters">{(["Todos","Mercado","Hogar"]as const).map(x=><button key={x} className={value===x?"active":""} onClick={()=>set(x)}>{x}</button>)}<button className={delivery?"active":""} onClick={()=>{setDelivery(!delivery);emit({delivery:!delivery})}}>Con envío</button><button className={available?"active":""} onClick={()=>{setAvailable(!available);emit({available:!available})}}>Disponible</button></div><label className="sort-control">Ordenar por<select value={order} onChange={e=>{setOrder(e.target.value);emit({sort:e.target.value})}}><option value="total">Menor precio total</option><option value="distance">Más cerca</option><option value="discount">Mayor descuento</option></select></label></div>}
-function Card({item,radius,open,remove}:{item:Item;radius:number;open:()=>void;remove?:()=>void}){const best=item.offers[0],drop=best&&item.old?Math.round((1-best.price/item.old)*100):0,count=item.offers.filter(o=>item.category==="Hogar"||(o.distance||99)<=radius).length;return <article className="card" onClick={open}><div className="card-top"><div className="pic">{item.emoji}</div><div className="copy"><span>{item.persisted?"Guardado · ":"Ejemplo · "}{item.category}</span><h3>{item.name}</h3><p>{item.brand} · {item.detail}</p></div><button aria-label={remove?"Eliminar producto":"Producto de ejemplo"} onClick={e=>{e.stopPropagation();remove?.()}}>{remove?"×":"♥"}</button></div>{best?<><div className="deal"><div><small>Mejor precio</small><strong>{money(best.price)}</strong><del>{money(item.old)}</del></div><b>↓ {drop}%</b></div><footer><span>{best.store}</span><i>•</i><span>{item.category==="Mercado"?`${best.distance} km`:best.shipping===0?"Envío gratis":"Envío nacional"}</span><button>Comparar {count} ›</button></footer></>:<div className="searching"><i/>Esperando la primera consulta de precios</div>}</article>}
-function Add({close,save}:{close:()=>void;save:(p:ProductDraft)=>void}){const[step,setStep]=useState<"search"|"confirm">("search"),[name,setName]=useState(""),[brand,setBrand]=useState(""),[category,setCategory]=useState<"Mercado"|"Hogar">("Mercado"),[presentation,setPresentation]=useState(""),[barcode,setBarcode]=useState(""),[model,setModel]=useState(""),[picked,setPicked]=useState<CatalogProduct|null>(null);const results=findCatalogProducts(`${name} ${brand} ${barcode} ${model}`,category);function choose(p:CatalogProduct){setPicked(p);setName(p.name);setBrand(p.brand);setPresentation(p.presentation);setBarcode(p.barcode||"");setModel(p.model||"");setStep("confirm")}function submit(e:FormEvent){e.preventDefault();if(step==="search"){setStep("confirm");return}save({name,brand,category,presentation,barcode,model,emoji:picked?.emoji||(category==="Mercado"?"🛒":"🏠")})}return <Overlay close={close}><form className="sheet identity-sheet" onSubmit={submit}><Head over={step==="search"?"1 DE 2 · BUSCAR":"2 DE 2 · CONFIRMAR"} title={step==="search"?"¿Cuál es el producto?":"Confirmá la variante"} sub={step==="search"?"Buscamos por nombre, marca, código o modelo.":"Estos datos evitan comparar productos diferentes."} close={close}/>{step==="search"?<><div className="category compact">{(["Mercado","Hogar"]as const).map(x=><button type="button" key={x} className={category===x?"active":""} onClick={()=>{setCategory(x);setPicked(null)}}><span>{x==="Mercado"?"🛒":"🏠"}</span><strong>{x==="Mercado"?"Supermercado":"Casa y electro"}</strong></button>)}</div><label>Nombre del producto<input autoFocus required value={name} onChange={e=>setName(e.target.value)} placeholder="Ej. Café torrado"/></label><label>Marca<input value={brand} onChange={e=>setBrand(e.target.value)} placeholder="Ej. Pilão"/></label>{results.length>0&&<div className="matches"><span>POSIBLES COINCIDENCIAS</span>{results.map(p=><button type="button" key={p.id} onClick={()=>choose(p)}><i>{p.emoji}</i><div><strong>{p.name}</strong><small>{p.brand} · {p.presentation}</small>{(p.barcode||p.model)&&<em>{p.barcode?`EAN ${p.barcode}`:`Modelo ${p.model}`}</em>}</div><b>›</b></button>)}</div>}<button className="submit">Continuar con los detalles <b>›</b></button></>:<><div className="identity-summary"><i>{picked?.emoji||(category==="Mercado"?"🛒":"🏠")}</i><div><strong>{name}</strong><span>{brand}</span></div><button type="button" onClick={()=>setStep("search")}>Cambiar</button></div><label>{category==="Mercado"?"Presentación o tamaño":"Modelo exacto"}<input required value={category==="Mercado"?presentation:model} onChange={e=>category==="Mercado"?setPresentation(e.target.value):setModel(e.target.value)} placeholder={category==="Mercado"?"Ej. paquete 500 g":"Ej. UN55DU8000GXZD"}/></label><label>EAN / GTIN <small>(opcional)</small><input inputMode="numeric" pattern="[0-9]{8,14}" value={barcode} onChange={e=>setBarcode(e.target.value.replace(/\D/g,""))} placeholder="8 a 14 dígitos"/></label><div className="identity-check"><span>✓</span><div><strong>Comparación exacta</strong><p>Solo relacionaremos ofertas con esta presentación y modelo. Las coincidencias dudosas requerirán confirmación.</p></div></div><button className="submit">Confirmar y guardar <b>›</b></button></>}<small className="privacy">El código de barras es la forma más segura de identificar productos de supermercado.</small></form></Overlay>}
-function Offers({item,radius,close}:{item:Item;radius:number;close:()=>void}){const list=item.offers.filter(o=>item.category==="Hogar"||(o.distance||99)<=radius).sort((a,b)=>(a.price+(a.shipping||0))-(b.price+(b.shipping||0)));return <Overlay close={close}><div className="sheet shipping-sheet"><Head over={item.category} title={item.name} sub={`${item.brand} · ${item.detail}`} close={close}/><div className="total-label">ORDENADO POR PRECIO TOTAL</div><div className="shipping-list">{list.length?list.map((o,i)=>{const total=o.price+(o.shipping||0),mode=o.method==="pickup"?"Retiro en tienda":o.method==="local"?"Envío local":"Envío nacional";return <article key={`${o.store}-${o.seller||"direct"}`} className={i===0?"best":""}><header><div className="store">{o.store[0]}</div><div><strong>{o.store}</strong><small>{o.marketplace?`Vendido por ${o.seller}`:"Venta directa"}{o.condition?` · ${o.condition}`:""}</small></div>{i===0&&<b>Mejor total</b>}</header><div className="shipping-price"><div><span>Producto</span><strong>{money(o.price)}</strong></div><div><span>{o.delivery?"Envío":"Retiro"}</span><strong className={o.shipping===0?"free":""}>{o.shipping===0?(o.delivery?"Gratis":"Sin costo"):money(o.shipping||0)}</strong></div><div className="grand"><span>Total</span><strong>{money(total)}</strong></div></div><footer><span>{o.delivery?"🚚":"⌖"} {mode}</span>{o.eta&&<span>◷ {o.eta}</span>}{o.distance&&<span>{o.distance} km</span>}</footer>{o.minimumOrder&&<p>Compra mínima para esta modalidad: {money(o.minimumOrder)}</p>}</article>}):<div className="empty">No hay ofertas disponibles para tu zona.</div>}</div><div className="shipping-legend"><div><span>⌖</span><p><strong>Retiro</strong>Buscá el producto en la sucursal.</p></div><div><span>🚚</span><p><strong>Envío</strong>El costo y plazo dependen del CEP.</p></div></div><HistoryPanel item={item}/><div className="note">Antes de comprar, confirmá precio, vendedor, stock, plazo y costo final en la tienda.</div></div></Overlay>}
-function Location({location,radius,locating,detect,close,save}:{location:string;radius:number;locating:boolean;detect:()=>void;close:()=>void;save:(l:string,r:number,g?:{latitude:number;longitude:number;postalCode?:string})=>void}){const[l,setL]=useState(location),[r,setR]=useState(radius),[searching,setSearching]=useState(false),[error,setError]=useState("");async function apply(){setSearching(true);setError("");const response=await fetch(`/api/geocode?q=${encodeURIComponent(l)}`),data=await response.json();setSearching(false);if(!response.ok){setError(data.error||"No encontramos esa ubicación");return}const p=data.location;save(p.city?`${p.city}${p.region?`, ${p.region}`:""}`:p.label,r,{latitude:p.latitude,longitude:p.longitude,postalCode:p.postalCode})}return <Overlay close={close}><div className="sheet"><Head over="TU ZONA" title="Ofertas cerca de vos" sub="Usamos tu ubicación solo para calcular distancias." close={close}/><button className="detect" onClick={detect}><i>⌖</i><div><strong>{locating?"Buscando y verificando…":"Usar mi ubicación actual"}</strong><small>Más rápido y preciso</small></div><b>›</b></button><label>Ciudad, dirección o CEP<input value={l} onChange={e=>setL(e.target.value)} placeholder="Ej. 01310-100 o Campinas, SP"/></label>{error&&<div className="location-error">! {error}</div>}<div className="range"><div><strong>Mostrar mercados hasta</strong><b>{r} km</b></div><input type="range" min="1" max="50" value={r} onChange={e=>setR(+e.target.value)}/><footer><span>1 km</span><span>50 km</span></footer></div><button className="submit" disabled={searching} onClick={apply}>{searching?"Verificando ubicación…":"Aplicar zona"} <b>›</b></button><small className="privacy">Geocodificación por OpenStreetMap. Solo guardamos las coordenadas necesarias para calcular distancias.</small></div></Overlay>}
-function Overlay({children,close}:{children:React.ReactNode;close:()=>void}){return <div className="overlay" onMouseDown={e=>e.target===e.currentTarget&&close()}>{children}</div>}function Head({over,title,sub,close}:{over:string;title:string;sub:string;close:()=>void}){return <><div className="handle"/><div className="sheet-head"><div><span>{over}</span><h2>{title}</h2><p>{sub}</p></div><button onClick={close}>×</button></div></>}
-function SourceRegistry(){const [segment,setSegment]=useState<"Mercado"|"Hogar">("Mercado"),sources=priceSources.filter(s=>s.segment===segment);return <section className="sources"><div className="sources-head"><div><p>MERCADO INICIAL</p><h2>{launchMarket.country} · {launchMarket.initialRegion}</h2><span>{priceSources.filter(s=>s.enabled).length} fuentes registradas</span></div><b>BR</b></div><div className="filters"><button className={segment==="Mercado"?"active":""} onClick={()=>setSegment("Mercado")}>Supermercados</button><button className={segment==="Hogar"?"active":""} onClick={()=>setSegment("Hogar")}>Hogar y electro</button></div><div className="source-list">{sources.map(s=><a key={s.id} href={s.url} target="_blank" rel="noreferrer"><i>{s.name[0]}</i><div><strong>{s.name}</strong><small>{s.coverage} · {s.locationMode}</small></div><span className={s.enabled?"ready":"watch"}>{s.enabled?(s.priority==="Inicial"?"Inicial":"Después"):"Revisar"}</span></a>)}</div><div className="source-foot">Las fuentes están registradas. Sus precios todavía no se importan: eso comienza en las siguientes etapas.</div></section>}
-function DailyStatus(){return <section className="daily-status"><div className="daily-title"><i>↻</i><div><strong>Revisión diaria programada</strong><span>Todos los días a las 08:00 · hora de Brasilia</span></div><b>Activa</b></div><div className="daily-counts"><div><strong>16</strong><span>fuentes</span></div><div><strong>15</strong><span>esperando conector</span></div><div><strong>1</strong><span>en observación</span></div></div><p>El ciclo registra cada intento y sus errores. Hasta conectar una tienda, no publicará precios inventados ni conservará datos como si estuvieran actualizados.</p></section>}
-function AccountCard({account}:{account:Account}){return <>{account?<section className="account-card"><div className="account-initial">{account.name[0]?.toUpperCase()||"U"}</div><div><strong>{account.name}</strong><span>{account.email}</span><small>Sincronización activa en tus dispositivos</small></div><a href="/signout-with-chatgpt?return_to=%2F">Salir</a></section>:<section className="account-card signed-out"><div className="account-initial">?</div><div><strong>Guardá tus productos</strong><span>Iniciá sesión para sincronizarlos.</span></div><a href="/signin-with-chatgpt?return_to=%2F">Ingresar</a></section>}<section className="privacy-tools"><div><a href="/privacidade">Privacidad</a><a href="/termos">Términos</a>{account&&<a href="/api/account">Exportar mis datos</a>}</div>{account&&<button onClick={async()=>{if(!confirm("¿Eliminar definitivamente tu cuenta, productos, listas y alertas?"))return;const r=await fetch("/api/account",{method:"DELETE",headers:{"x-confirm-delete":"EXCLUIR"}});if(r.ok)location.href="/signout-with-chatgpt?return_to=%2F"}}>Eliminar mi cuenta</button>}</section></>}
-function NearbyCoverage(){const[info,setInfo]=useState<{branches?:{id:string;store:string;name:string;distanceKm:number}[];needsLocation?:boolean}|null>(null);useEffect(()=>{fetch("/api/branches").then(r=>r.ok?r.json():null).then(setInfo)},[]);return <section className="nearby"><div><i>◎</i><span><strong>Sucursales dentro de tu radio</strong><small>{info?.needsLocation?"Elegí una ubicación precisa":info?.branches?.length?`${info.branches.length} sucursales verificadas`:"Aún no hay sucursales verificadas"}</small></span></div>{info?.branches?.slice(0,3).map(b=><article key={b.id}><span>{b.store} · {b.name}</span><b>{b.distanceKm} km</b></article>)}<p>Las distancias se calculan en línea recta. Las sucursales aparecerán cuando cada tienda publique o confirme sus ubicaciones.</p></section>}
-function HistoryPanel({item}:{item:Item}){const[data,setData]=useState<{points:{totalPrice:number;capturedAt:string}[];metrics:{min:number;max:number;average:number;current:number}|null;trust:{status:string;message:string}}|null>(null),[reported,setReported]=useState(false);useEffect(()=>{if(item.persisted)fetch(`/api/history?productId=${item.id}`).then(r=>r.ok?r.json():null).then(setData)},[item.id,item.persisted]);if(!item.persisted)return <section className="history-panel demo-history"><h3>Historial de precio</h3><p>Este producto es un ejemplo. No mostramos una evolución inventada.</p></section>;if(!data||!data.metrics)return <section className="history-panel"><h3>Historial de precio</h3><p>Esperando las primeras capturas reales para calcular mínimo, máximo y promedio.</p></section>;const values=data.points.map(p=>p.totalPrice),min=Math.min(...values),max=Math.max(...values);return <section className="history-panel"><div className="history-head"><h3>Historial · 6 meses</h3><span className={`trust ${data.trust.status}`}>{data.trust.message}</span></div><div className="history-metrics"><div><span>Actual</span><strong>{money(data.metrics.current)}</strong></div><div><span>Mínimo</span><strong>{money(data.metrics.min)}</strong></div><div><span>Promedio</span><strong>{money(data.metrics.average)}</strong></div></div><div className="price-line">{values.map((v,i)=><i key={i} style={{height:`${25+((v-min)/(max-min||1))*65}%`}} title={money(v)}/>)}</div><button className="report-price" disabled={reported} onClick={async()=>{await fetch("/api/price-reports",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({productId:String(item.id),reason:"incorrect_price"})});setReported(true)}}>{reported?"✓ Reporte enviado":"Reportar precio incorrecto"}</button></section>}
-function AlertsCenter({items}:{items:Item[]}){const[data,setData]=useState<{rules:{id:string;productId:string;productName:string;type:string;threshold:number|null}[];events:{id:string;title:string;message:string;createdAt:string}[]}>({rules:[],events:[]}),[open,setOpen]=useState(false),[productId,setProductId]=useState(""),[type,setType]=useState("target_price"),[threshold,setThreshold]=useState("");const load=()=>fetch("/api/alerts").then(r=>r.ok?r.json():{rules:[],events:[]}).then(setData);useEffect(()=>{load()},[]);async function create(e:FormEvent){e.preventDefault();const r=await fetch("/api/alerts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({productId,type,threshold:Number(threshold)||undefined})});if(r.ok){setOpen(false);load()}}async function remove(id:string){await fetch(`/api/alerts/${id}`,{method:"DELETE"});load()}return <section className="inner"><Title over="TE AVISAMOS A TIEMPO" title="Alertas" sub={`${data.rules.length} condiciones activas`} action={()=>setOpen(true)}/>{open&&<form className="alert-form" onSubmit={create}><label>Producto<select required value={productId} onChange={e=>setProductId(e.target.value)}><option value="">Elegí un producto</option>{items.map(i=><option key={i.id} value={String(i.id)}>{i.name} · {i.brand}</option>)}</select></label><label>Quiero saber cuando<select value={type} onChange={e=>setType(e.target.value)}><option value="target_price">Baje de un precio</option><option value="price_drop">Baje de precio</option><option value="back_in_stock">Vuelva a tener stock</option><option value="free_shipping">Tenga envío gratis</option></select></label>{type==="target_price"&&<label>Precio objetivo<input required type="number" min="0.01" step="0.01" value={threshold} onChange={e=>setThreshold(e.target.value)} placeholder="R$ 0,00"/></label>}<button className="submit">Crear alerta</button></form>}<div className="alert-rules">{data.rules.map(r=><article key={r.id}><i>♢</i><div><strong>{r.productName}</strong><span>{r.type==="target_price"?`Precio objetivo ${money(r.threshold||0)}`:r.type==="free_shipping"?"Envío gratis":r.type==="back_in_stock"?"Vuelta de stock":"Cualquier bajada"}</span></div><button onClick={()=>remove(r.id)}>×</button></article>)}</div><h3 className="event-title">Actividad</h3><div className="notifications">{data.events.length?data.events.map(e=><article key={e.id}><i>↓</i><div><strong>{e.title}</strong><p>{e.message}</p><small>{new Date(e.createdAt).toLocaleString("es")}</small></div></article>):<div className="empty-alerts">Todavía no se activó ninguna alerta real.</div>}</div><div className="note alert-note">Las alertas se evalúan con el ciclo diario. Correo y push quedan preparados, pero requieren proveedores externos antes de activarse.</div></section>}
+function ShoppingLists({ items }: { items: Item[] }) {
+  type L = {
+    id: string;
+    name: string;
+    items: {
+      id: string;
+      productId: string;
+      name: string;
+      brand: string;
+      quantity: number;
+      purchased: boolean;
+    }[];
+  };
+  const [lists, setLists] = useState<L[]>([]),
+    [name, setName] = useState(""),
+    [selected, setSelected] = useState(""),
+    [product, setProduct] = useState(""),
+    [result, setResult] = useState<{
+      ready: boolean;
+      missing?: string[];
+      oneStore?: { stores: string[]; total: number };
+      split?: { stores: string[]; total: number };
+    } | null>(null);
+  const load = () =>
+    fetch("/api/lists")
+      .then((r) => (r.ok ? r.json() : { lists: [] }))
+      .then((d) => {
+        setLists(d.lists);
+        if (!selected && d.lists[0]) setSelected(d.lists[0].id);
+      });
+  useEffect(() => {
+    load();
+  }, []);
+  async function create(e: FormEvent) {
+    e.preventDefault();
+    await fetch("/api/lists", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    setName("");
+    load();
+  }
+  async function addItem() {
+    if (!selected || !product) return;
+    await fetch(`/api/lists/${selected}/items`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ productId: product, quantity: 1 }),
+    });
+    setProduct("");
+    load();
+  }
+  async function optimize() {
+    const r = await fetch(`/api/lists/${selected}/optimize`);
+    setResult(await r.json());
+  }
+  const active = lists.find((l) => l.id === selected);
+  return (
+    <section className="inner">
+      <Title
+        over="PLANIFICÁ TU COMPRA"
+        title="Mis listas"
+        sub="Compará una tienda o hasta tres"
+      />
+      <form className="new-list" onSubmit={create}>
+        <input
+          required
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Ej. Compra semanal"
+        />
+        <button>＋ Crear</button>
+      </form>
+      {lists.length > 0 && (
+        <>
+          <div className="list-tabs">
+            {lists.map((l) => (
+              <button
+                key={l.id}
+                className={selected === l.id ? "active" : ""}
+                onClick={() => {
+                  setSelected(l.id);
+                  setResult(null);
+                }}
+              >
+                {l.name}
+              </button>
+            ))}
+          </div>
+          <div className="add-list-item">
+            <select
+              value={product}
+              onChange={(e) => setProduct(e.target.value)}
+            >
+              <option value="">Agregar producto guardado</option>
+              {items.map((i) => (
+                <option key={i.id} value={String(i.id)}>
+                  {i.name} · {i.brand}
+                </option>
+              ))}
+            </select>
+            <button onClick={addItem}>Agregar</button>
+          </div>
+          <div className="list-items">
+            {active?.items.map((i) => (
+              <article key={i.id}>
+                <i>{i.purchased ? "✓" : "○"}</i>
+                <div>
+                  <strong>{i.name}</strong>
+                  <span>
+                    {i.brand} · Cantidad {i.quantity}
+                  </span>
+                </div>
+              </article>
+            ))}
+          </div>
+          <button className="optimize" onClick={optimize}>
+            ✦ Calcular mejor combinación
+          </button>
+          {result && (
+            <div className="optimization">
+              {!result.ready ? (
+                <>
+                  <strong>Faltan precios reales</strong>
+                  <p>
+                    {result.missing?.join(", ") ||
+                      "La lista todavía no tiene ofertas comparables."}
+                  </p>
+                </>
+              ) : (
+                <>
+                  {result.oneStore && (
+                    <article>
+                      <span>Todo en una tienda</span>
+                      <strong>{money(result.oneStore.total)}</strong>
+                      <small>{result.oneStore.stores.join(", ")}</small>
+                    </article>
+                  )}
+                  {result.split && (
+                    <article className="best">
+                      <span>Dividir la compra</span>
+                      <strong>{money(result.split.total)}</strong>
+                      <small>{result.split.stores.join(" + ")}</small>
+                    </article>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </>
+      )}
+      {!lists.length && (
+        <div className="empty-alerts">Creá tu primera lista para comenzar.</div>
+      )}
+    </section>
+  );
+}
+export default function Home() {
+  const [tab, setTab] = useState<Tab>("inicio"),
+    [items, setItems] = useState(seed),
+    [filter, setFilter] = useState<"Todos" | "Mercado" | "Hogar">("Todos"),
+    [radius, setRadius] = useState(10),
+    [location, setLocation] = useState("São Paulo, SP"),
+    [locationOpen, setLocationOpen] = useState(false),
+    [addOpen, setAddOpen] = useState(false),
+    [selected, setSelected] = useState<Item | null>(null),
+    [toast, setToast] = useState(""),
+    [locating, setLocating] = useState(false),
+    [account, setAccount] = useState<Account>(null),
+    [query, setQuery] = useState(""),
+    [deliveryOnly, setDeliveryOnly] = useState(false),
+    [availableOnly, setAvailableOnly] = useState(false),
+    [sort, setSort] = useState<"total" | "distance" | "discount">("total");
+  const visible = useMemo(
+    () =>
+      items
+        .filter(
+          (i) =>
+            (filter === "Todos" || i.category === filter) &&
+            fuzzyMatch(query, `${i.name} ${i.brand} ${i.detail}`) &&
+            (!availableOnly || i.offers.length > 0) &&
+            (!deliveryOnly || i.offers.some((o) => o.delivery)),
+        )
+        .sort((a, b) => {
+          const best = (x: Item) =>
+            x.offers.length
+              ? Math.min(...x.offers.map((o) => o.price + (o.shipping || 0)))
+              : Number.MAX_SAFE_INTEGER;
+          if (sort === "distance")
+            return (
+              Math.min(...a.offers.map((o) => o.distance || 999)) -
+              Math.min(...b.offers.map((o) => o.distance || 999))
+            );
+          if (sort === "discount") return b.old - best(b) - (a.old - best(a));
+          return best(a) - best(b);
+        }),
+    [items, filter, query, deliveryOnly, availableOnly, sort],
+  );
+  const notify = (m: string) => {
+    setToast(m);
+    setTimeout(() => setToast(""), 3000);
+  };
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/products").then((r) => (r.ok ? r.json() : { products: [] })),
+      fetch("/api/preferences").then((r) => (r.ok ? r.json() : {})),
+      fetch("/api/me").then((r) => r.json()),
+    ])
+      .then(([p, pref, me]) => {
+        const saved = (p.products || []).map(
+          (x: {
+            id: string;
+            name: string;
+            brand: string | null;
+            description: string | null;
+            model: string | null;
+            attributes?: { category?: string };
+          }) =>
+            ({
+              id: x.id,
+              emoji: x.attributes?.category === "Hogar" ? "🏠" : "🛒",
+              name: x.name,
+              brand: x.brand || "Sin marca",
+              detail: x.description || x.model || "Presentación confirmada",
+              category:
+                x.attributes?.category === "Hogar" ? "Hogar" : "Mercado",
+              old: 0,
+              offers: [],
+              persisted: true,
+            }) as Item,
+        );
+        setItems([...saved, ...seed]);
+        if (pref.preferences) {
+          setLocation(
+            `${pref.preferences.city || "São Paulo"}, ${pref.preferences.region || "SP"}`,
+          );
+          setRadius(pref.preferences.radiusKm || 10);
+        }
+        if (me.user) setAccount({ name: me.user.name, email: me.user.email });
+      })
+      .catch(() => notify("No pudimos cargar tus datos guardados"));
+  }, []);
+  useEffect(() => {
+    const search = (e: Event) => setQuery((e as CustomEvent<string>).detail),
+      options = (e: Event) => {
+        const d = (
+          e as CustomEvent<{
+            delivery?: boolean;
+            available?: boolean;
+            sort?: "total" | "distance" | "discount";
+          }>
+        ).detail;
+        if (d.delivery !== undefined) setDeliveryOnly(d.delivery);
+        if (d.available !== undefined) setAvailableOnly(d.available);
+        if (d.sort) setSort(d.sort);
+      };
+    window.addEventListener("precio-search", search);
+    window.addEventListener("precio-options", options);
+    return () => {
+      window.removeEventListener("precio-search", search);
+      window.removeEventListener("precio-options", options);
+    };
+  }, []);
+  useEffect(() => {
+    if ("serviceWorker" in navigator)
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    const offline = () =>
+        notify("Estás sin conexión. Mostramos la última versión disponible."),
+      online = () => notify("Conexión recuperada");
+    window.addEventListener("offline", offline);
+    window.addEventListener("online", online);
+    return () => {
+      window.removeEventListener("offline", offline);
+      window.removeEventListener("online", online);
+    };
+  }, []);
+  function detect() {
+    setLocating(true);
+    if (!navigator.geolocation) {
+      setLocating(false);
+      notify("Tu navegador no permite usar ubicación");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const response = await fetch(
+              `/api/geocode?lat=${position.coords.latitude}&lon=${position.coords.longitude}`,
+            ),
+            data = await response.json();
+          if (!response.ok) throw new Error(data.error);
+          const place = data.location;
+          savePreferences(place.city || "Ubicación actual", radius, {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            postalCode: place.postalCode,
+          });
+          notify("Ubicación precisa guardada");
+        } catch {
+          setLocating(false);
+          notify("No pudimos reconocer la dirección");
+        }
+      },
+      () => {
+        setLocating(false);
+        notify("No pudimos acceder. Podés elegirla manualmente.");
+      },
+    );
+  }
+  async function add(product: ProductDraft) {
+    const response = await fetch("/api/products", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(product),
+    });
+    if (!response.ok) {
+      notify("No pudimos guardar el producto");
+      return;
+    }
+    const { product: row } = await response.json();
+    setItems((v) => [
+      {
+        id: row.id,
+        emoji: product.emoji,
+        name: product.name,
+        brand: product.brand,
+        detail:
+          product.presentation || product.model || "Presentación confirmada",
+        category: product.category,
+        old: 0,
+        offers: [],
+        persisted: true,
+      },
+      ...v,
+    ]);
+    setAddOpen(false);
+    setTab("guardados");
+    notify("Producto guardado en tu perfil.");
+  }
+  async function remove(item: Item) {
+    if (!item.persisted) return;
+    const response = await fetch(`/api/products/${item.id}`, {
+      method: "DELETE",
+    });
+    if (response.ok) {
+      setItems((v) => v.filter((x) => x.id !== item.id));
+      notify("Producto eliminado");
+    }
+  }
+  function savePreferences(
+    l: string,
+    r: number,
+    geo?: { latitude: number; longitude: number; postalCode?: string },
+  ) {
+    setLocation(l);
+    setRadius(r);
+    setLocationOpen(false);
+    setLocating(false);
+    fetch("/api/preferences", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        city: l.replace(/,\s*SP$/i, ""),
+        radiusKm: r,
+        ...geo,
+      }),
+    }).then((x) =>
+      x.ok
+        ? notify("Zona guardada en tu perfil")
+        : notify("No pudimos guardar la zona"),
+    );
+  }
+  return (
+    <div className="app">
+      <header className="topbar">
+        <div className="logo">
+          <span>p</span>
+          <strong>precio</strong>
+          <b>cerca</b>
+        </div>
+        <button className="place" onClick={() => setLocationOpen(true)}>
+          <i>⌖</i>
+          <span>
+            <small>Comprando en</small>
+            {location}
+          </span>
+          <b>⌄</b>
+        </button>
+        <button
+          className="avatar"
+          onClick={() => setTab("perfil")}
+          aria-label="Abrir perfil"
+        >
+          {account?.name?.[0]?.toUpperCase() || "?"}
+        </button>
+      </header>
+      <main>
+        {tab === "inicio" && (
+          <>
+            <section className="hero">
+              <div className="eyebrow">AHORRÁ CERCA TUYO</div>
+              <h1>
+                ¿Qué precio
+                <br />
+                querés comparar?
+              </h1>
+              <p>Guardá un producto y te mostramos dónde conviene comprarlo.</p>
+              <button className="add-main" onClick={() => setAddOpen(true)}>
+                <span>＋</span>
+                <div>
+                  <strong>Agregar producto</strong>
+                  <small>Nombre, marca y listo</small>
+                </div>
+                <b>›</b>
+              </button>
+            </section>
+            <section className="quick">
+              <button
+                onClick={() => {
+                  setFilter("Mercado");
+                  document
+                    .getElementById("ofertas")
+                    ?.scrollIntoView({ behavior: "smooth" });
+                }}
+              >
+                <span>🛒</span>
+                <div>
+                  <strong>Supermercado</strong>
+                  <small>Ofertas a {radius} km</small>
+                </div>
+                <b>›</b>
+              </button>
+              <button
+                onClick={() => {
+                  setFilter("Hogar");
+                  document
+                    .getElementById("ofertas")
+                    ?.scrollIntoView({ behavior: "smooth" });
+                }}
+              >
+                <span>🏠</span>
+                <div>
+                  <strong>Casa y electro</strong>
+                  <small>Envíos nacionales</small>
+                </div>
+                <b>›</b>
+              </button>
+            </section>
+            <section className="section" id="ofertas">
+              <div className="section-head">
+                <div>
+                  <span>✦</span>
+                  <h2>Mejores ofertas</h2>
+                  <p>Actualizadas hoy a las 08:00</p>
+                </div>
+                <button onClick={() => setTab("guardados")}>Ver todo</button>
+              </div>
+              <Filters value={filter} set={setFilter} />
+              <div className="cards">
+                {visible.map((i) => (
+                  <Card
+                    key={i.id}
+                    item={i}
+                    radius={radius}
+                    open={() => setSelected(i)}
+                  />
+                ))}
+              </div>
+            </section>
+            <section className="how">
+              <span>🔔</span>
+              <div>
+                <strong>Vos guardás. Nosotros seguimos.</strong>
+                <p>
+                  Revisamos los precios cada día y te avisamos cuando aparece
+                  una buena oferta.
+                </p>
+              </div>
+            </section>
+          </>
+        )}
+        {tab === "guardados" && (
+          <section className="inner">
+            <Title
+              over="TUS SEGUIMIENTOS"
+              title="Guardados"
+              sub={`${items.filter((i) => i.persisted).length} productos personales · actualización diaria`}
+              action={() => setAddOpen(true)}
+            />
+            <Filters value={filter} set={setFilter} />
+            <div className="cards saved">
+              {visible.map((i) => (
+                <Card
+                  key={i.id}
+                  item={i}
+                  radius={radius}
+                  open={() => setSelected(i)}
+                  remove={i.persisted ? () => remove(i) : undefined}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+        {tab === "listas" && (
+          <ShoppingLists items={items.filter((i) => i.persisted)} />
+        )}
+        {tab === "alertas" && (
+          <AlertsCenter items={items.filter((i) => i.persisted)} />
+        )}
+        {tab === "perfil" && (
+          <section className="inner">
+            <Title
+              over="TUS PREFERENCIAS"
+              title="Mi cuenta"
+              sub="Tus productos sincronizados y tu zona"
+            />
+            <AccountCard account={account} />
+            <div className="settings">
+              <button onClick={() => setLocationOpen(true)}>
+                <span>⌖</span>
+                <div>
+                  <strong>Ubicación</strong>
+                  <small>{location}</small>
+                </div>
+                <b>›</b>
+              </button>
+              <div className="range">
+                <div>
+                  <strong>Radio de búsqueda</strong>
+                  <b>{radius} km</b>
+                </div>
+                <input
+                  aria-label="Radio"
+                  type="range"
+                  min="1"
+                  max="50"
+                  value={radius}
+                  onChange={(e) => setRadius(+e.target.value)}
+                />
+                <footer>
+                  <span>1 km</span>
+                  <span>50 km</span>
+                </footer>
+              </div>
+              <div className="note">
+                Para hogar también mostramos tiendas con envío nacional, aunque
+                estén fuera de tu radio.
+              </div>
+            </div>
+            <NearbyCoverage />
+            <DailyStatus />
+            <SourceRegistry />
+            <AdminPanel />
+          </section>
+        )}
+      </main>
+      <nav className="bottom-nav">
+        {(
+          [
+            { id: "inicio", icon: "⌂", label: "Inicio" },
+            { id: "guardados", icon: "♡", label: "Guardados" },
+            { id: "listas", icon: "☷", label: "Listas" },
+            { id: "alertas", icon: "♢", label: "Alertas" },
+            { id: "perfil", icon: "○", label: "Mi zona" },
+          ] as const
+        ).map((n) => (
+          <button
+            key={n.id}
+            className={tab === n.id ? "active" : ""}
+            onClick={() => setTab(n.id)}
+          >
+            <i>{n.icon}</i>
+            <span>{n.label}</span>
+            {n.id === "alertas" && <b />}
+          </button>
+        ))}
+      </nav>
+      {addOpen && <Add close={() => setAddOpen(false)} save={add} />}{" "}
+      {selected && (
+        <Offers
+          item={selected}
+          radius={radius}
+          close={() => setSelected(null)}
+        />
+      )}{" "}
+      {locationOpen && (
+        <Location
+          location={location}
+          radius={radius}
+          locating={locating}
+          detect={detect}
+          close={() => setLocationOpen(false)}
+          save={savePreferences}
+        />
+      )}{" "}
+      {toast && <div className="toast">✓ {toast}</div>}
+    </div>
+  );
+}
+function Title({
+  over,
+  title,
+  sub,
+  action,
+}: {
+  over: string;
+  title: string;
+  sub: string;
+  action?: () => void;
+}) {
+  return (
+    <div className="title">
+      <div>
+        <p>{over}</p>
+        <h1>{title}</h1>
+        <span>{sub}</span>
+      </div>
+      {action && <button onClick={action}>＋</button>}
+    </div>
+  );
+}
+function Filters({
+  value,
+  set,
+}: {
+  value: string;
+  set: (v: "Todos" | "Mercado" | "Hogar") => void;
+}) {
+  const [q, setQ] = useState(""),
+    [delivery, setDelivery] = useState(false),
+    [available, setAvailable] = useState(false),
+    [order, setOrder] = useState("total");
+  function emit(detail: object) {
+    window.dispatchEvent(new CustomEvent("precio-options", { detail }));
+  }
+  return (
+    <div className="search-tools">
+      <div className="inline-search">
+        <span>⌕</span>
+        <input
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            window.dispatchEvent(
+              new CustomEvent("precio-search", { detail: e.target.value }),
+            );
+          }}
+          placeholder="Buscar producto, marca o tamaño"
+        />
+        {q && (
+          <button
+            onClick={() => {
+              setQ("");
+              window.dispatchEvent(
+                new CustomEvent("precio-search", { detail: "" }),
+              );
+            }}
+          >
+            ×
+          </button>
+        )}
+      </div>
+      <div className="filters">
+        {(["Todos", "Mercado", "Hogar"] as const).map((x) => (
+          <button
+            key={x}
+            className={value === x ? "active" : ""}
+            onClick={() => set(x)}
+          >
+            {x}
+          </button>
+        ))}
+        <button
+          className={delivery ? "active" : ""}
+          onClick={() => {
+            setDelivery(!delivery);
+            emit({ delivery: !delivery });
+          }}
+        >
+          Con envío
+        </button>
+        <button
+          className={available ? "active" : ""}
+          onClick={() => {
+            setAvailable(!available);
+            emit({ available: !available });
+          }}
+        >
+          Disponible
+        </button>
+      </div>
+      <label className="sort-control">
+        Ordenar por
+        <select
+          value={order}
+          onChange={(e) => {
+            setOrder(e.target.value);
+            emit({ sort: e.target.value });
+          }}
+        >
+          <option value="total">Menor precio total</option>
+          <option value="distance">Más cerca</option>
+          <option value="discount">Mayor descuento</option>
+        </select>
+      </label>
+    </div>
+  );
+}
+function Card({
+  item,
+  radius,
+  open,
+  remove,
+}: {
+  item: Item;
+  radius: number;
+  open: () => void;
+  remove?: () => void;
+}) {
+  const best = item.offers[0],
+    drop = best && item.old ? Math.round((1 - best.price / item.old) * 100) : 0,
+    count = item.offers.filter(
+      (o) => item.category === "Hogar" || (o.distance || 99) <= radius,
+    ).length;
+  return (
+    <article className="card" onClick={open}>
+      <div className="card-top">
+        <div className="pic">{item.emoji}</div>
+        <div className="copy">
+          <span>
+            {item.persisted ? "Guardado · " : "Ejemplo · "}
+            {item.category}
+          </span>
+          <h3>{item.name}</h3>
+          <p>
+            {item.brand} · {item.detail}
+          </p>
+        </div>
+        <button
+          aria-label={remove ? "Eliminar producto" : "Producto de ejemplo"}
+          onClick={(e) => {
+            e.stopPropagation();
+            remove?.();
+          }}
+        >
+          {remove ? "×" : "♥"}
+        </button>
+      </div>
+      {best ? (
+        <>
+          <div className="deal">
+            <div>
+              <small>Mejor precio</small>
+              <strong>{money(best.price)}</strong>
+              <del>{money(item.old)}</del>
+            </div>
+            <b>↓ {drop}%</b>
+          </div>
+          <footer>
+            <span>{best.store}</span>
+            <i>•</i>
+            <span>
+              {item.category === "Mercado"
+                ? `${best.distance} km`
+                : best.shipping === 0
+                  ? "Envío gratis"
+                  : "Envío nacional"}
+            </span>
+            <button>Comparar {count} ›</button>
+          </footer>
+        </>
+      ) : (
+        <div className="searching">
+          <i />
+          Esperando la primera consulta de precios
+        </div>
+      )}
+    </article>
+  );
+}
+function Add({
+  close,
+  save,
+}: {
+  close: () => void;
+  save: (p: ProductDraft) => void;
+}) {
+  const [step, setStep] = useState<"search" | "confirm">("search"),
+    [name, setName] = useState(""),
+    [brand, setBrand] = useState(""),
+    [category, setCategory] = useState<"Mercado" | "Hogar">("Mercado"),
+    [presentation, setPresentation] = useState(""),
+    [barcode, setBarcode] = useState(""),
+    [model, setModel] = useState(""),
+    [picked, setPicked] = useState<CatalogProduct | null>(null);
+  const results = findCatalogProducts(
+    `${name} ${brand} ${barcode} ${model}`,
+    category,
+  );
+  function choose(p: CatalogProduct) {
+    setPicked(p);
+    setName(p.name);
+    setBrand(p.brand);
+    setPresentation(p.presentation);
+    setBarcode(p.barcode || "");
+    setModel(p.model || "");
+    setStep("confirm");
+  }
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    if (step === "search") {
+      setStep("confirm");
+      return;
+    }
+    save({
+      name,
+      brand,
+      category,
+      presentation,
+      barcode,
+      model,
+      emoji: picked?.emoji || (category === "Mercado" ? "🛒" : "🏠"),
+    });
+  }
+  return (
+    <Overlay close={close}>
+      <form className="sheet identity-sheet" onSubmit={submit}>
+        <Head
+          over={step === "search" ? "1 DE 2 · BUSCAR" : "2 DE 2 · CONFIRMAR"}
+          title={
+            step === "search" ? "¿Cuál es el producto?" : "Confirmá la variante"
+          }
+          sub={
+            step === "search"
+              ? "Buscamos por nombre, marca, código o modelo."
+              : "Estos datos evitan comparar productos diferentes."
+          }
+          close={close}
+        />
+        {step === "search" ? (
+          <>
+            <div className="category compact">
+              {(["Mercado", "Hogar"] as const).map((x) => (
+                <button
+                  type="button"
+                  key={x}
+                  className={category === x ? "active" : ""}
+                  onClick={() => {
+                    setCategory(x);
+                    setPicked(null);
+                  }}
+                >
+                  <span>{x === "Mercado" ? "🛒" : "🏠"}</span>
+                  <strong>
+                    {x === "Mercado" ? "Supermercado" : "Casa y electro"}
+                  </strong>
+                </button>
+              ))}
+            </div>
+            <label>
+              Nombre del producto
+              <input
+                autoFocus
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ej. Café torrado"
+              />
+            </label>
+            <label>
+              Marca
+              <input
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+                placeholder="Ej. Pilão"
+              />
+            </label>
+            {results.length > 0 && (
+              <div className="matches">
+                <span>POSIBLES COINCIDENCIAS</span>
+                {results.map((p) => (
+                  <button type="button" key={p.id} onClick={() => choose(p)}>
+                    <i>{p.emoji}</i>
+                    <div>
+                      <strong>{p.name}</strong>
+                      <small>
+                        {p.brand} · {p.presentation}
+                      </small>
+                      {(p.barcode || p.model) && (
+                        <em>
+                          {p.barcode ? `EAN ${p.barcode}` : `Modelo ${p.model}`}
+                        </em>
+                      )}
+                    </div>
+                    <b>›</b>
+                  </button>
+                ))}
+              </div>
+            )}
+            <button className="submit">
+              Continuar con los detalles <b>›</b>
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="identity-summary">
+              <i>{picked?.emoji || (category === "Mercado" ? "🛒" : "🏠")}</i>
+              <div>
+                <strong>{name}</strong>
+                <span>{brand}</span>
+              </div>
+              <button type="button" onClick={() => setStep("search")}>
+                Cambiar
+              </button>
+            </div>
+            <label>
+              {category === "Mercado"
+                ? "Presentación o tamaño"
+                : "Modelo exacto"}
+              <input
+                required
+                value={category === "Mercado" ? presentation : model}
+                onChange={(e) =>
+                  category === "Mercado"
+                    ? setPresentation(e.target.value)
+                    : setModel(e.target.value)
+                }
+                placeholder={
+                  category === "Mercado"
+                    ? "Ej. paquete 500 g"
+                    : "Ej. UN55DU8000GXZD"
+                }
+              />
+            </label>
+            <label>
+              EAN / GTIN <small>(opcional)</small>
+              <input
+                inputMode="numeric"
+                pattern="[0-9]{8,14}"
+                value={barcode}
+                onChange={(e) => setBarcode(e.target.value.replace(/\D/g, ""))}
+                placeholder="8 a 14 dígitos"
+              />
+            </label>
+            <div className="identity-check">
+              <span>✓</span>
+              <div>
+                <strong>Comparación exacta</strong>
+                <p>
+                  Solo relacionaremos ofertas con esta presentación y modelo.
+                  Las coincidencias dudosas requerirán confirmación.
+                </p>
+              </div>
+            </div>
+            <button className="submit">
+              Confirmar y guardar <b>›</b>
+            </button>
+          </>
+        )}
+        <small className="privacy">
+          El código de barras es la forma más segura de identificar productos de
+          supermercado.
+        </small>
+      </form>
+    </Overlay>
+  );
+}
+function Offers({
+  item,
+  radius,
+  close,
+}: {
+  item: Item;
+  radius: number;
+  close: () => void;
+}) {
+  const list = item.offers
+    .filter((o) => item.category === "Hogar" || (o.distance || 99) <= radius)
+    .sort(
+      (a, b) => a.price + (a.shipping || 0) - (b.price + (b.shipping || 0)),
+    );
+  return (
+    <Overlay close={close}>
+      <div className="sheet shipping-sheet">
+        <Head
+          over={item.category}
+          title={item.name}
+          sub={`${item.brand} · ${item.detail}`}
+          close={close}
+        />
+        <div className="total-label">ORDENADO POR PRECIO TOTAL</div>
+        <div className="shipping-list">
+          {list.length ? (
+            list.map((o, i) => {
+              const total = o.price + (o.shipping || 0),
+                mode =
+                  o.method === "pickup"
+                    ? "Retiro en tienda"
+                    : o.method === "local"
+                      ? "Envío local"
+                      : "Envío nacional";
+              return (
+                <article
+                  key={`${o.store}-${o.seller || "direct"}`}
+                  className={i === 0 ? "best" : ""}
+                >
+                  <header>
+                    <div className="store">{o.store[0]}</div>
+                    <div>
+                      <strong>{o.store}</strong>
+                      <small>
+                        {o.marketplace
+                          ? `Vendido por ${o.seller}`
+                          : "Venta directa"}
+                        {o.condition ? ` · ${o.condition}` : ""}
+                      </small>
+                    </div>
+                    {i === 0 && <b>Mejor total</b>}
+                  </header>
+                  <div className="shipping-price">
+                    <div>
+                      <span>Producto</span>
+                      <strong>{money(o.price)}</strong>
+                    </div>
+                    <div>
+                      <span>{o.delivery ? "Envío" : "Retiro"}</span>
+                      <strong className={o.shipping === 0 ? "free" : ""}>
+                        {o.shipping === 0
+                          ? o.delivery
+                            ? "Gratis"
+                            : "Sin costo"
+                          : money(o.shipping || 0)}
+                      </strong>
+                    </div>
+                    <div className="grand">
+                      <span>Total</span>
+                      <strong>{money(total)}</strong>
+                    </div>
+                  </div>
+                  <footer>
+                    <span>
+                      {o.delivery ? "🚚" : "⌖"} {mode}
+                    </span>
+                    {o.eta && <span>◷ {o.eta}</span>}
+                    {o.distance && <span>{o.distance} km</span>}
+                  </footer>
+                  {o.minimumOrder && (
+                    <p>
+                      Compra mínima para esta modalidad: {money(o.minimumOrder)}
+                    </p>
+                  )}
+                </article>
+              );
+            })
+          ) : (
+            <div className="empty">
+              No hay ofertas disponibles para tu zona.
+            </div>
+          )}
+        </div>
+        <div className="shipping-legend">
+          <div>
+            <span>⌖</span>
+            <p>
+              <strong>Retiro</strong>Buscá el producto en la sucursal.
+            </p>
+          </div>
+          <div>
+            <span>🚚</span>
+            <p>
+              <strong>Envío</strong>El costo y plazo dependen del CEP.
+            </p>
+          </div>
+        </div>
+        <HistoryPanel item={item} />
+        <div className="note">
+          Antes de comprar, confirmá precio, vendedor, stock, plazo y costo
+          final en la tienda.
+        </div>
+      </div>
+    </Overlay>
+  );
+}
+function Location({
+  location,
+  radius,
+  locating,
+  detect,
+  close,
+  save,
+}: {
+  location: string;
+  radius: number;
+  locating: boolean;
+  detect: () => void;
+  close: () => void;
+  save: (
+    l: string,
+    r: number,
+    g?: { latitude: number; longitude: number; postalCode?: string },
+  ) => void;
+}) {
+  const [l, setL] = useState(location),
+    [r, setR] = useState(radius),
+    [searching, setSearching] = useState(false),
+    [error, setError] = useState("");
+  async function apply() {
+    setSearching(true);
+    setError("");
+    const response = await fetch(`/api/geocode?q=${encodeURIComponent(l)}`),
+      data = await response.json();
+    setSearching(false);
+    if (!response.ok) {
+      setError(data.error || "No encontramos esa ubicación");
+      return;
+    }
+    const p = data.location;
+    save(p.city ? `${p.city}${p.region ? `, ${p.region}` : ""}` : p.label, r, {
+      latitude: p.latitude,
+      longitude: p.longitude,
+      postalCode: p.postalCode,
+    });
+  }
+  return (
+    <Overlay close={close}>
+      <div className="sheet">
+        <Head
+          over="TU ZONA"
+          title="Ofertas cerca de vos"
+          sub="Usamos tu ubicación solo para calcular distancias."
+          close={close}
+        />
+        <button className="detect" onClick={detect}>
+          <i>⌖</i>
+          <div>
+            <strong>
+              {locating
+                ? "Buscando y verificando…"
+                : "Usar mi ubicación actual"}
+            </strong>
+            <small>Más rápido y preciso</small>
+          </div>
+          <b>›</b>
+        </button>
+        <label>
+          Ciudad, dirección o CEP
+          <input
+            value={l}
+            onChange={(e) => setL(e.target.value)}
+            placeholder="Ej. 01310-100 o Campinas, SP"
+          />
+        </label>
+        {error && <div className="location-error">! {error}</div>}
+        <div className="range">
+          <div>
+            <strong>Mostrar mercados hasta</strong>
+            <b>{r} km</b>
+          </div>
+          <input
+            type="range"
+            min="1"
+            max="50"
+            value={r}
+            onChange={(e) => setR(+e.target.value)}
+          />
+          <footer>
+            <span>1 km</span>
+            <span>50 km</span>
+          </footer>
+        </div>
+        <button className="submit" disabled={searching} onClick={apply}>
+          {searching ? "Verificando ubicación…" : "Aplicar zona"} <b>›</b>
+        </button>
+        <small className="privacy">
+          Geocodificación por OpenStreetMap. Solo guardamos las coordenadas
+          necesarias para calcular distancias.
+        </small>
+      </div>
+    </Overlay>
+  );
+}
+function Overlay({
+  children,
+  close,
+}: {
+  children: React.ReactNode;
+  close: () => void;
+}) {
+  return (
+    <div
+      className="overlay"
+      onMouseDown={(e) => e.target === e.currentTarget && close()}
+    >
+      {children}
+    </div>
+  );
+}
+function Head({
+  over,
+  title,
+  sub,
+  close,
+}: {
+  over: string;
+  title: string;
+  sub: string;
+  close: () => void;
+}) {
+  return (
+    <>
+      <div className="handle" />
+      <div className="sheet-head">
+        <div>
+          <span>{over}</span>
+          <h2>{title}</h2>
+          <p>{sub}</p>
+        </div>
+        <button onClick={close}>×</button>
+      </div>
+    </>
+  );
+}
+function SourceRegistry() {
+  const [segment, setSegment] = useState<"Mercado" | "Hogar">("Mercado"),
+    sources = priceSources.filter((s) => s.segment === segment);
+  return (
+    <section className="sources">
+      <div className="sources-head">
+        <div>
+          <p>MERCADO INICIAL</p>
+          <h2>
+            {launchMarket.country} · {launchMarket.initialRegion}
+          </h2>
+          <span>
+            {priceSources.filter((s) => s.enabled).length} fuentes registradas
+          </span>
+        </div>
+        <b>BR</b>
+      </div>
+      <div className="filters">
+        <button
+          className={segment === "Mercado" ? "active" : ""}
+          onClick={() => setSegment("Mercado")}
+        >
+          Supermercados
+        </button>
+        <button
+          className={segment === "Hogar" ? "active" : ""}
+          onClick={() => setSegment("Hogar")}
+        >
+          Hogar y electro
+        </button>
+      </div>
+      <div className="source-list">
+        {sources.map((s) => (
+          <a key={s.id} href={s.url} target="_blank" rel="noreferrer">
+            <i>{s.name[0]}</i>
+            <div>
+              <strong>{s.name}</strong>
+              <small>
+                {s.coverage} · {s.locationMode}
+              </small>
+            </div>
+            <span className={s.enabled ? "ready" : "watch"}>
+              {s.enabled
+                ? s.priority === "Inicial"
+                  ? "Inicial"
+                  : "Después"
+                : "Revisar"}
+            </span>
+          </a>
+        ))}
+      </div>
+      <div className="source-foot">
+        Las fuentes están registradas. Sus precios todavía no se importan: eso
+        comienza en las siguientes etapas.
+      </div>
+    </section>
+  );
+}
+function DailyStatus() {
+  return (
+    <section className="daily-status">
+      <div className="daily-title">
+        <i>↻</i>
+        <div>
+          <strong>Revisión diaria programada</strong>
+          <span>Todos los días a las 08:00 · hora de Brasilia</span>
+        </div>
+        <b>Activa</b>
+      </div>
+      <div className="daily-counts">
+        <div>
+          <strong>16</strong>
+          <span>fuentes</span>
+        </div>
+        <div>
+          <strong>15</strong>
+          <span>esperando conector</span>
+        </div>
+        <div>
+          <strong>1</strong>
+          <span>en observación</span>
+        </div>
+      </div>
+      <p>
+        El ciclo registra cada intento y sus errores. Hasta conectar una tienda,
+        no publicará precios inventados ni conservará datos como si estuvieran
+        actualizados.
+      </p>
+    </section>
+  );
+}
+function AccountCard({ account }: { account: Account }) {
+  return (
+    <>
+      {account ? (
+        <section className="account-card">
+          <div className="account-initial">
+            {account.name[0]?.toUpperCase() || "U"}
+          </div>
+          <div>
+            <strong>{account.name}</strong>
+            <span>{account.email}</span>
+            <small>Sincronización activa en tus dispositivos</small>
+          </div>
+          <a href="/logout">Salir</a>
+        </section>
+      ) : (
+        <section className="account-card signed-out">
+          <div className="account-initial">?</div>
+          <div>
+            <strong>Guardá tus productos</strong>
+            <span>Iniciá sesión para sincronizarlos.</span>
+          </div>
+          <a href="/login">Ingresar con Google</a>
+        </section>
+      )}
+      <section className="privacy-tools">
+        <div>
+          <a href="/privacidade">Privacidad</a>
+          <a href="/termos">Términos</a>
+          {account && <a href="/api/account">Exportar mis datos</a>}
+        </div>
+        {account && (
+          <button
+            onClick={async () => {
+              if (
+                !confirm(
+                  "¿Eliminar definitivamente tu cuenta, productos, listas y alertas?",
+                )
+              )
+                return;
+              const r = await fetch("/api/account", {
+                method: "DELETE",
+                headers: { "x-confirm-delete": "EXCLUIR" },
+              });
+              if (r.ok) {
+                if (firebaseAuth?.currentUser) {
+                  try {
+                    await deleteUser(firebaseAuth.currentUser);
+                  } catch {
+                    alert("Tus datos fueron eliminados. Para borrar también el acceso de Google, volvé a ingresar y repetí la eliminación.");
+                  }
+                }
+                location.href = "/logout";
+              }
+            }}
+          >
+            Eliminar mi cuenta
+          </button>
+        )}
+      </section>
+    </>
+  );
+}
+function NearbyCoverage() {
+  const [info, setInfo] = useState<{
+    branches?: {
+      id: string;
+      store: string;
+      name: string;
+      distanceKm: number;
+    }[];
+    needsLocation?: boolean;
+  } | null>(null);
+  useEffect(() => {
+    fetch("/api/branches")
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setInfo);
+  }, []);
+  return (
+    <section className="nearby">
+      <div>
+        <i>◎</i>
+        <span>
+          <strong>Sucursales dentro de tu radio</strong>
+          <small>
+            {info?.needsLocation
+              ? "Elegí una ubicación precisa"
+              : info?.branches?.length
+                ? `${info.branches.length} sucursales verificadas`
+                : "Aún no hay sucursales verificadas"}
+          </small>
+        </span>
+      </div>
+      {info?.branches?.slice(0, 3).map((b) => (
+        <article key={b.id}>
+          <span>
+            {b.store} · {b.name}
+          </span>
+          <b>{b.distanceKm} km</b>
+        </article>
+      ))}
+      <p>
+        Las distancias se calculan en línea recta. Las sucursales aparecerán
+        cuando cada tienda publique o confirme sus ubicaciones.
+      </p>
+    </section>
+  );
+}
+function HistoryPanel({ item }: { item: Item }) {
+  const [data, setData] = useState<{
+      points: { totalPrice: number; capturedAt: string }[];
+      metrics: {
+        min: number;
+        max: number;
+        average: number;
+        current: number;
+      } | null;
+      trust: { status: string; message: string };
+    } | null>(null),
+    [reported, setReported] = useState(false);
+  useEffect(() => {
+    if (item.persisted)
+      fetch(`/api/history?productId=${item.id}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then(setData);
+  }, [item.id, item.persisted]);
+  if (!item.persisted)
+    return (
+      <section className="history-panel demo-history">
+        <h3>Historial de precio</h3>
+        <p>
+          Este producto es un ejemplo. No mostramos una evolución inventada.
+        </p>
+      </section>
+    );
+  if (!data || !data.metrics)
+    return (
+      <section className="history-panel">
+        <h3>Historial de precio</h3>
+        <p>
+          Esperando las primeras capturas reales para calcular mínimo, máximo y
+          promedio.
+        </p>
+      </section>
+    );
+  const values = data.points.map((p) => p.totalPrice),
+    min = Math.min(...values),
+    max = Math.max(...values);
+  return (
+    <section className="history-panel">
+      <div className="history-head">
+        <h3>Historial · 6 meses</h3>
+        <span className={`trust ${data.trust.status}`}>
+          {data.trust.message}
+        </span>
+      </div>
+      <div className="history-metrics">
+        <div>
+          <span>Actual</span>
+          <strong>{money(data.metrics.current)}</strong>
+        </div>
+        <div>
+          <span>Mínimo</span>
+          <strong>{money(data.metrics.min)}</strong>
+        </div>
+        <div>
+          <span>Promedio</span>
+          <strong>{money(data.metrics.average)}</strong>
+        </div>
+      </div>
+      <div className="price-line">
+        {values.map((v, i) => (
+          <i
+            key={i}
+            style={{ height: `${25 + ((v - min) / (max - min || 1)) * 65}%` }}
+            title={money(v)}
+          />
+        ))}
+      </div>
+      <button
+        className="report-price"
+        disabled={reported}
+        onClick={async () => {
+          await fetch("/api/price-reports", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              productId: String(item.id),
+              reason: "incorrect_price",
+            }),
+          });
+          setReported(true);
+        }}
+      >
+        {reported ? "✓ Reporte enviado" : "Reportar precio incorrecto"}
+      </button>
+    </section>
+  );
+}
+function AlertsCenter({ items }: { items: Item[] }) {
+  const [data, setData] = useState<{
+      rules: {
+        id: string;
+        productId: string;
+        productName: string;
+        type: string;
+        threshold: number | null;
+      }[];
+      events: {
+        id: string;
+        title: string;
+        message: string;
+        createdAt: string;
+      }[];
+    }>({ rules: [], events: [] }),
+    [open, setOpen] = useState(false),
+    [productId, setProductId] = useState(""),
+    [type, setType] = useState("target_price"),
+    [threshold, setThreshold] = useState("");
+  const load = () =>
+    fetch("/api/alerts")
+      .then((r) => (r.ok ? r.json() : { rules: [], events: [] }))
+      .then(setData);
+  useEffect(() => {
+    load();
+  }, []);
+  async function create(e: FormEvent) {
+    e.preventDefault();
+    const r = await fetch("/api/alerts", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        productId,
+        type,
+        threshold: Number(threshold) || undefined,
+      }),
+    });
+    if (r.ok) {
+      setOpen(false);
+      load();
+    }
+  }
+  async function remove(id: string) {
+    await fetch(`/api/alerts/${id}`, { method: "DELETE" });
+    load();
+  }
+  return (
+    <section className="inner">
+      <Title
+        over="TE AVISAMOS A TIEMPO"
+        title="Alertas"
+        sub={`${data.rules.length} condiciones activas`}
+        action={() => setOpen(true)}
+      />
+      {open && (
+        <form className="alert-form" onSubmit={create}>
+          <label>
+            Producto
+            <select
+              required
+              value={productId}
+              onChange={(e) => setProductId(e.target.value)}
+            >
+              <option value="">Elegí un producto</option>
+              {items.map((i) => (
+                <option key={i.id} value={String(i.id)}>
+                  {i.name} · {i.brand}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Quiero saber cuando
+            <select value={type} onChange={(e) => setType(e.target.value)}>
+              <option value="target_price">Baje de un precio</option>
+              <option value="price_drop">Baje de precio</option>
+              <option value="back_in_stock">Vuelva a tener stock</option>
+              <option value="free_shipping">Tenga envío gratis</option>
+            </select>
+          </label>
+          {type === "target_price" && (
+            <label>
+              Precio objetivo
+              <input
+                required
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={threshold}
+                onChange={(e) => setThreshold(e.target.value)}
+                placeholder="R$ 0,00"
+              />
+            </label>
+          )}
+          <button className="submit">Crear alerta</button>
+        </form>
+      )}
+      <div className="alert-rules">
+        {data.rules.map((r) => (
+          <article key={r.id}>
+            <i>♢</i>
+            <div>
+              <strong>{r.productName}</strong>
+              <span>
+                {r.type === "target_price"
+                  ? `Precio objetivo ${money(r.threshold || 0)}`
+                  : r.type === "free_shipping"
+                    ? "Envío gratis"
+                    : r.type === "back_in_stock"
+                      ? "Vuelta de stock"
+                      : "Cualquier bajada"}
+              </span>
+            </div>
+            <button onClick={() => remove(r.id)}>×</button>
+          </article>
+        ))}
+      </div>
+      <h3 className="event-title">Actividad</h3>
+      <div className="notifications">
+        {data.events.length ? (
+          data.events.map((e) => (
+            <article key={e.id}>
+              <i>↓</i>
+              <div>
+                <strong>{e.title}</strong>
+                <p>{e.message}</p>
+                <small>{new Date(e.createdAt).toLocaleString("es")}</small>
+              </div>
+            </article>
+          ))
+        ) : (
+          <div className="empty-alerts">
+            Todavía no se activó ninguna alerta real.
+          </div>
+        )}
+      </div>
+      <div className="note alert-note">
+        Las alertas se evalúan con el ciclo diario. Correo y push quedan
+        preparados, pero requieren proveedores externos antes de activarse.
+      </div>
+    </section>
+  );
+}
