@@ -7,6 +7,7 @@ permissions:
   contents: read
 jobs:
   refresh:
+    if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SHOPCERTO != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

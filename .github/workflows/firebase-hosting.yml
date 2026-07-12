@@ -9,6 +9,7 @@ permissions:
   pull-requests: write
 jobs:
   deploy:
+    if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SHOPCERTO != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

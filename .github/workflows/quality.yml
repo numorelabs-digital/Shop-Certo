@@ -12,6 +12,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: firebase-web/package-lock.json
       - run: npm ci
-      - run: npm run lint
+        working-directory: firebase-web
       - run: npm run build
+        working-directory: firebase-web
