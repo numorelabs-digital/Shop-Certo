@@ -1,0 +1,6 @@
+import { and, eq, gt } from "drizzle-orm";
+import { getDb } from "../../../db";
+import { productLinks, products, shippingQuotes } from "../../../db/schema";
+import { ensureRequestUser } from "../../../lib/request-user";
+
+export async function GET(request:Request){const user=await ensureRequestUser(request);if(!user)return Response.json({error:"Sesión requerida"},{status:401});const url=new URL(request.url),productLinkId=url.searchParams.get("productLinkId"),postalCode=url.searchParams.get("postalCode")?.replace(/\D/g,"");if(!productLinkId||!postalCode||postalCode.length!==8)return Response.json({error:"Producto y CEP válido requeridos"},{status:400});const owned=await getDb().select({id:productLinks.id}).from(productLinks).innerJoin(products,eq(productLinks.productId,products.id)).where(and(eq(productLinks.id,productLinkId),eq(products.userId,user.id))).limit(1);if(!owned.length)return Response.json({error:"Oferta no encontrada"},{status:404});const quotes=await getDb().select().from(shippingQuotes).where(and(eq(shippingQuotes.productLinkId,productLinkId),eq(shippingQuotes.postalCode,postalCode),gt(shippingQuotes.expiresAt,new Date())));return Response.json({quotes,needsQuote:quotes.length===0})}

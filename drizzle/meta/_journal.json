@@ -43,6 +43,13 @@
       "when": 1783890969027,
       "tag": "0005_naive_naoko",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1783891740379,
+      "tag": "0006_free_hitman",
+      "breakpoints": true
     }
   ]
 }
