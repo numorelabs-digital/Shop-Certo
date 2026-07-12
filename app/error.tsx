@@ -1,0 +1,1 @@
+"use client";export default function ErrorPage({reset}:{error:Error&{digest?:string};reset:()=>void}){return <main className="error-page"><span>!</span><h1>Algo no salió bien</h1><p>Registramos el problema. Tus productos guardados no se perdieron.</p><button onClick={reset}>Intentar nuevamente</button><a href="/">Volver al inicio</a></main>}
