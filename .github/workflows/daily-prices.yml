@@ -7,8 +7,9 @@ permissions:
   contents: read
 jobs:
   refresh:
-    if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SHOPCERTO != '' }}
     runs-on: ubuntu-latest
+    env:
+      FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SHOPCERTO }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,6 +20,5 @@ jobs:
       - run: npm ci
         working-directory: automation
       - run: node refresh-prices.mjs
+        if: env.FIREBASE_SERVICE_ACCOUNT != ''
         working-directory: automation
-        env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SHOPCERTO }}
