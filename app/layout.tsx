@@ -1,6 +1,1 @@
-import type { Metadata } from "next";
-import { Geist } from "next/font/google";
-import "./globals.css";
-const geist=Geist({variable:"--font-geist",subsets:["latin"]});
-export const metadata:Metadata={title:"PrecioClaro — Comparador personal",description:"Organizá productos, compará el precio total y decidí cuándo comprar.",manifest:"/manifest.webmanifest"};
-export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="es"><body className={geist.variable}>{children}</body></html>}
+import type {Metadata} from "next";import "./globals.css";export const metadata:Metadata={title:"PrecioCerca — encontrá el mejor precio",description:"Compará precios de supermercado, hogar y electro cerca tuyo o con envío nacional.",manifest:"/manifest.webmanifest"};export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="es"><body>{children}</body></html>}
