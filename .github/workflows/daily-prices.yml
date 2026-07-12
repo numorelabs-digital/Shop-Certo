@@ -1,0 +1,23 @@
+name: Daily price refresh
+on:
+  schedule:
+    - cron: "15 11 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: automation/package-lock.json
+      - run: npm ci
+        working-directory: automation
+      - run: node refresh-prices.mjs
+        working-directory: automation
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SHOPCERTO }}
