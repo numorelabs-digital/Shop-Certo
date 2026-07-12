@@ -1,0 +1,3 @@
+export function normalizeSearch(value:string){return value.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLocaleLowerCase("pt-BR").replace(/[^a-z0-9]+/g," ").trim()}
+export function fuzzyMatch(query:string,text:string){const q=normalizeSearch(query),target=normalizeSearch(text);if(!q)return true;if(target.includes(q))return true;return q.split(" ").every(term=>target.split(" ").some(word=>word.includes(term)||distance(term,word)<=Math.max(1,Math.floor(term.length/4))))}
+function distance(a:string,b:string){const row=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){let prev=row[0];row[0]=i;for(let j=1;j<=b.length;j++){const old=row[j];row[j]=Math.min(row[j]+1,row[j-1]+1,prev+(a[i-1]===b[j-1]?0:1));prev=old}}return row[b.length]}
