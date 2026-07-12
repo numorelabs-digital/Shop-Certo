@@ -1,4 +1,5 @@
 import { priceSources } from "../sources";
+import { evaluateAlerts } from "./evaluate-alerts";
 
 type UpdateSummary = { jobId: string; status: "completed" | "partial" | "failed"; sources: number; checked: number; pending: number; failed: number };
 
@@ -35,6 +36,7 @@ export async function runDailyPriceUpdate(db: D1Database, trigger: "scheduled" |
     }
   }
 
+  await evaluateAlerts(db);
   const status = failed ? "partial" : "completed";
   await db.prepare("UPDATE update_jobs SET status=?, completed_at=?, checked_count=?, pending_count=?, failed_count=? WHERE id=?")
     .bind(status, Date.now(), checked, pending, failed, jobId).run();
