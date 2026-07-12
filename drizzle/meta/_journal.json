@@ -15,6 +15,13 @@
       "when": 1783889117166,
       "tag": "0001_round_sandman",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1783889798861,
+      "tag": "0002_clumsy_mentor",
+      "breakpoints": true
     }
   ]
 }
