@@ -2,7 +2,8 @@ import { getDb } from "../db";
 import { users } from "../db/schema";
 
 export async function ensureRequestUser(request: Request) {
-  const email = request.headers.get("oai-authenticated-user-email")?.trim().toLowerCase() || "owner@preciocerca.local";
+  const email = request.headers.get("oai-authenticated-user-email")?.trim().toLowerCase();
+  if (!email) return null;
   const encodedName = request.headers.get("oai-authenticated-user-full-name");
   const name = encodedName && request.headers.get("oai-authenticated-user-full-name-encoding") === "percent-encoded-utf-8" ? decodeURIComponent(encodedName) : "Mi perfil";
   const id = `usr_${await sha256(email)}`;
