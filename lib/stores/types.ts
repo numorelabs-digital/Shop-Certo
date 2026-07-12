@@ -1,0 +1,2 @@
+export type OfferResult={title:string;price:number|null;originalPrice:number|null;shipping:number|null;totalPrice:number|null;currency:string;availability:"in_stock"|"out_of_stock"|"unknown";seller:string|null;image:string|null;lastUpdated:string;sourceUrl:string;status:"success"|"manual_required"|"error";error:string|null};
+export interface StoreAdapter{readonly id:string;canHandle(url:URL):boolean;fetch(url:URL):Promise<OfferResult>}
