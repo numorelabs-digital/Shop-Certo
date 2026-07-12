@@ -22,6 +22,13 @@
       "when": 1783889798861,
       "tag": "0002_clumsy_mentor",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1783890016384,
+      "tag": "0003_tranquil_speed",
+      "breakpoints": true
     }
   ]
 }
