@@ -30,6 +30,15 @@ const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
+    if (url.pathname.startsWith("/api/") && request.method !== "GET") {
+      const ip = request.headers.get("cf-connecting-ip") || "unknown";
+      const bucket = Math.floor(Date.now() / 60_000);
+      const key = `${ip}:${bucket}`;
+      await env.DB.prepare("INSERT INTO request_rate_limits (key,count,expires_at) VALUES (?,1,?) ON CONFLICT(key) DO UPDATE SET count=count+1").bind(key, Date.now()+120_000).run();
+      const limit = await env.DB.prepare("SELECT count FROM request_rate_limits WHERE key=?").bind(key).first<{count:number}>();
+      if ((limit?.count || 0) > 60) return Response.json({error:"Demasiadas solicitudes. Intentá nuevamente en un minuto."},{status:429,headers:{"Retry-After":"60"}});
+    }
+
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
       return handleImageOptimization(request, {
