@@ -1,5 +1,6 @@
 import { getDb } from "../db";
 import { users } from "../db/schema";
+import { eq } from "drizzle-orm";
 
 export async function ensureRequestUser(request: Request) {
   const email = request.headers.get("oai-authenticated-user-email")?.trim().toLowerCase();
@@ -9,7 +10,8 @@ export async function ensureRequestUser(request: Request) {
   const id = `usr_${await sha256(email)}`;
   const now = new Date();
   await getDb().insert(users).values({id,email,name,createdAt:now,updatedAt:now}).onConflictDoUpdate({target:users.id,set:{name,updatedAt:now}});
-  return { id, email, name };
+  const [record]=await getDb().select({role:users.role}).from(users).where(eq(users.id,id));
+  return { id, email, name, role:record?.role||"user" };
 }
 
 async function sha256(value:string){const bytes=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));return Array.from(new Uint8Array(bytes)).slice(0,12).map(x=>x.toString(16).padStart(2,"0")).join("")}
