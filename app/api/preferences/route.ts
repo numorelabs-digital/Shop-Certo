@@ -1,0 +1,7 @@
+import { eq } from "drizzle-orm";
+import { getDb } from "../../../db";
+import { userPreferences } from "../../../db/schema";
+import { ensureRequestUser } from "../../../lib/request-user";
+
+export async function GET(request:Request){const user=await ensureRequestUser(request);const [preferences]=await getDb().select().from(userPreferences).where(eq(userPreferences.userId,user.id));return Response.json({preferences:preferences||{countryCode:"BR",region:"SP",city:"São Paulo",radiusKm:10,dailyUpdateHour:8}})}
+export async function PUT(request:Request){const user=await ensureRequestUser(request);const data=await request.json() as {city?:string;radiusKm?:number;postalCode?:string;latitude?:number;longitude?:number};const radius=Math.max(1,Math.min(50,Number(data.radiusKm)||10)),now=new Date();await getDb().insert(userPreferences).values({userId:user.id,city:data.city?.trim()||"São Paulo",postalCode:data.postalCode||null,latitude:data.latitude??null,longitude:data.longitude??null,radiusKm:radius,updatedAt:now}).onConflictDoUpdate({target:userPreferences.userId,set:{city:data.city?.trim()||"São Paulo",postalCode:data.postalCode||null,latitude:data.latitude??null,longitude:data.longitude??null,radiusKm:radius,updatedAt:now}});return Response.json({saved:true})}
