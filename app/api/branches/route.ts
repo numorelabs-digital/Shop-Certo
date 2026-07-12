@@ -1,0 +1,6 @@
+import { eq } from "drizzle-orm";
+import { getDb } from "../../../db";
+import { storeBranches, stores, userPreferences } from "../../../db/schema";
+import { ensureRequestUser } from "../../../lib/request-user";
+import { distanceKm } from "../../../lib/geo";
+export async function GET(request:Request){const user=await ensureRequestUser(request);if(!user)return Response.json({error:"Sesión requerida"},{status:401});const [prefs]=await getDb().select().from(userPreferences).where(eq(userPreferences.userId,user.id));if(!prefs?.latitude||!prefs?.longitude)return Response.json({branches:[],needsLocation:true});const rows=await getDb().select({id:storeBranches.id,name:storeBranches.name,address:storeBranches.address,latitude:storeBranches.latitude,longitude:storeBranches.longitude,pickup:storeBranches.pickup,delivery:storeBranches.delivery,store:stores.name}).from(storeBranches).innerJoin(stores,eq(storeBranches.storeId,stores.id)).where(eq(storeBranches.active,true));const branches=rows.map(b=>({...b,distanceKm:Number(distanceKm({latitude:prefs.latitude!,longitude:prefs.longitude!},b).toFixed(2))})).filter(b=>b.distanceKm<=prefs.radiusKm).sort((a,b)=>a.distanceKm-b.distanceKm);return Response.json({branches,radiusKm:prefs.radiusKm})}
