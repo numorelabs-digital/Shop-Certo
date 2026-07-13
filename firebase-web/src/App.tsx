@@ -75,6 +75,10 @@ const money = (n: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
     n,
   );
+function timestampMillis(value:unknown){
+  if(value&&typeof value==="object"&&"toMillis" in value&&typeof (value as {toMillis?:unknown}).toMillis==="function")return (value as {toMillis:()=>number}).toMillis();
+  return 0;
+}
 const examples: Offer[] = [
   {
     id: "pilao",
@@ -451,9 +455,16 @@ function ProductOfferCard({ product, remove }: { product: Product; remove: () =>
         </span>
         <button className="remove-product" onClick={remove} aria-label={`Eliminar ${product.name}`}>×</button>
       </div>
-      {product.bestPrice && product.offerUrl ? <a className="offer-link" href={product.offerUrl} target="_blank" rel="noreferrer"><div className="price"><small>Melhor preço</small><b>{money(product.bestPrice)}</b>{product.oldPrice && <del>{money(product.oldPrice)}</del>}{drop > 0 && <em>↓ {drop}%</em>}</div><footer><span>{product.store || "Loja verificada"}</span><b>Total {money(total)} · Abrir oferta ›</b></footer></a> : <div className="offer-pending"><i></i><span><b>Buscando ofertas</b><small>Primeiros resultados em até 5 minutos. Depois, atualização diária.</small></span></div>}
+      {product.bestPrice && product.offerUrl ? <a className="offer-link" href={product.offerUrl} target="_blank" rel="noreferrer"><div className="price"><small>Melhor preço</small><b>{money(product.bestPrice)}</b>{product.oldPrice && <del>{money(product.oldPrice)}</del>}{drop > 0 && <em>↓ {drop}%</em>}</div><footer><span>{product.store || "Loja verificada"}</span><b>Total {money(total)} · Abrir oferta ›</b></footer></a> : <OfferCountdown requestedAt={product.refreshRequestedAt||product.createdAt} status={product.priceStatus}/>} 
     </article>
   );
+}
+function OfferCountdown({requestedAt,status}:{requestedAt:unknown;status?:Product["priceStatus"]}){
+  const [now,setNow]=useState(Date.now());
+  useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer)},[]);
+  const started=timestampMillis(requestedAt),remaining=Math.max(0,started+5*60*1000-now),minutes=Math.floor(remaining/60000),seconds=Math.floor((remaining%60000)/1000),count=`${String(minutes).padStart(2,"0")}:${String(seconds).padStart(2,"0")}`;
+  const waiting=!started||remaining===0;
+  return <div className={`offer-pending ${waiting?"offer-delayed":""}`}><i></i><span><b>{waiting?"Aguardando coleta de preços":"Buscando ofertas"}</b><small>{waiting?(status==="checking"||status==="queued"?"A verificação está na fila. Avisaremos assim que houver preços reais.":"Ainda não recebemos preços verificáveis para este produto."):`Tempo estimado restante: ${count}`}</small></span>{!waiting&&<strong>{count}</strong>}</div>
 }
 function Login({ login }: { login: () => void }) {
   return (

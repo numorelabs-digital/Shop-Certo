@@ -1,5 +1,10 @@
 name: Daily price refresh
 on:
+  push:
+    branches: [main]
+    paths:
+      - "automation/**"
+      - ".github/workflows/daily-prices.yml"
   schedule:
     - cron: "*/5 * * * *"
     - cron: "15 11 * * *"
@@ -20,6 +25,8 @@ jobs:
           cache-dependency-path: automation/package-lock.json
       - run: npm ci
         working-directory: automation
-      - run: node refresh-prices.mjs
-        if: env.FIREBASE_SERVICE_ACCOUNT != ''
+      - name: Verify Firebase credential
+        run: test -n "$FIREBASE_SERVICE_ACCOUNT" || (echo "Missing FIREBASE_SERVICE_ACCOUNT_SHOPCERTO secret" && exit 1)
+      - name: Process price requests and alerts
+        run: node refresh-prices.mjs
         working-directory: automation
