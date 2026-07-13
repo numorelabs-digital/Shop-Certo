@@ -100,6 +100,9 @@ function ShopApp() {
     [products, setProducts] = useState<Product[]>([]),
     [segment, setSegment] = useState<"Todos" | "Mercado" | "Hogar">("Todos"),
     [open, setOpen] = useState(false),
+    [preferencesOpen, setPreferencesOpen] = useState(false),
+    [location, setLocation] = useState("São Paulo, SP"),
+    [radius, setRadius] = useState(10),
     [toast, setToast] = useState("");
   useEffect(
     () =>
@@ -133,6 +136,14 @@ function ShopApp() {
         setProducts(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Product)),
     );
   }, [user]);
+  useEffect(() => {
+    if (!user) return;
+    return onSnapshot(doc(db, "users", user.uid), (snapshot) => {
+      const data = snapshot.data();
+      if (data?.location) setLocation(data.location);
+      if (data?.radiusKm) setRadius(data.radiusKm);
+    });
+  }, [user]);
   const savings = useMemo(() => products.reduce((n, p) => n + Math.max(0, (p.oldPrice || p.bestPrice || 0) - (p.bestPrice || 0)), 0), [products]);
   const visibleProducts = useMemo(() => products.filter((p) => segment === "Todos" || p.category === segment), [products, segment]);
   const notify = (s: string) => {
@@ -158,8 +169,8 @@ function ShopApp() {
         <a className="brand" onClick={() => setTab("inicio")}>
           <i>S</i>shop<b>certo</b>
         </a>
-        <button className="place" onClick={() => setTab("perfil")}>
-          ⌖ São Paulo, SP
+        <button className="place" onClick={() => setPreferencesOpen(true)}>
+          ⌖ {location}
         </button>
         <button className="avatar" onClick={() => setTab("perfil")}>
           {user?.photoURL ? (
@@ -305,19 +316,19 @@ function ShopApp() {
                   <button onClick={() => signOut(auth)}>Sair</button>
                 </section>
                 <section className="settings">
-                  <button>
+                  <button onClick={() => setPreferencesOpen(true)}>
                     ⌖
                     <span>
                       <b>Localização</b>
-                      <small>São Paulo, SP</small>
+                      <small>{location}</small>
                     </span>
                     ›
                   </button>
-                  <button>
+                  <button onClick={() => setPreferencesOpen(true)}>
                     ◎
                     <span>
                       <b>Raio de busca</b>
-                      <small>10 km</small>
+                      <small>{radius} km</small>
                     </span>
                     ›
                   </button>
@@ -396,6 +407,7 @@ function ShopApp() {
           }}
         />
       )}
+      {preferencesOpen && user && <Preferences location={location} radius={radius} close={() => setPreferencesOpen(false)} save={async (nextLocation, nextRadius) => {await setDoc(doc(db,"users",user.uid),{location:nextLocation,radiusKm:nextRadius,preferencesUpdatedAt:serverTimestamp()},{merge:true});setPreferencesOpen(false);notify("Localização e raio atualizados.");}} />}
       {toast && <div className="toast">✓ {toast}</div>}
     </div>
   );
@@ -530,6 +542,11 @@ function Add({
       </form>
     </div>
   );
+}
+
+function Preferences({location,radius,close,save}:{location:string;radius:number;close:()=>void;save:(location:string,radius:number)=>void}){
+  const [nextLocation,setNextLocation]=useState(location),[nextRadius,setNextRadius]=useState(radius);
+  return <div className="overlay" onMouseDown={(e)=>e.target===e.currentTarget&&close()}><form className="sheet preference-sheet" onSubmit={(e)=>{e.preventDefault();save(nextLocation.trim(),nextRadius)}}><header><span><small>SUA ÁREA</small><h2>Localização e raio</h2></span><button type="button" onClick={close}>×</button></header><label>Cidade, bairro ou CEP<input required value={nextLocation} onChange={(e)=>setNextLocation(e.target.value)} placeholder="Ex. Campinas, SP ou 01310-100"/></label><label className="radius-label"><span>Mostrar mercados até <b>{nextRadius} km</b></span><input type="range" min="1" max="50" value={nextRadius} onChange={(e)=>setNextRadius(Number(e.target.value))}/><footer><small>1 km</small><small>50 km</small></footer></label><div className="preference-note">A localização e o raio serão usados para filtrar supermercados. Produtos de casa e eletro continuam mostrando ofertas com envio nacional.</div><button className="primary">Salvar preferências</button></form></div>;
 }
 
 export default function App() {
