@@ -28,6 +28,7 @@ const words=v=>new Set(text(v).split(/[^a-z0-9]+/).filter(word=>word.length>1));
 const score=(query,title)=>{const wanted=words(query),found=words(title);return wanted.size?[...wanted].filter(word=>found.has(word)).length/wanted.size:0};
 const number=v=>{if(typeof v==="number")return v;const clean=String(v??"").replace(/[^0-9,.-]/g,"");if(!clean)return NaN;return Number(clean.includes(",")?clean.replaceAll(".","").replace(",","."):clean)};
 const absolute=(value,base)=>{try{return new URL(Array.isArray(value)?value[0]:value,base).toString()}catch{return null}};
+const cleanHtml=value=>String(value||"").replace(/<[^>]+>/g," ").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g," ").replace(/\s+/g," ").trim();
 
 async function download(url){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),18000);try{const response=await fetch(url,{headers,redirect:"follow",signal:controller.signal});if(!response.ok)throw new Error(`HTTP ${response.status}`);return{html:await response.text(),url:response.url}}finally{clearTimeout(timer)}}
 function structuredProducts(html,base,store){
@@ -36,6 +37,7 @@ function structuredProducts(html,base,store){
   for(const match of html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)){try{add(JSON.parse(match[1].trim()))}catch{}}
   const meta=(property)=>html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${property}["'][^>]+content=["']([^"']+)`,"i"))?.[1]||html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${property}["']`,"i"))?.[1];
   const metaPrice=number(meta("product:price:amount"));if(Number.isFinite(metaPrice)&&metaPrice>0)results.push({title:meta("og:title")||"Produto",price:metaPrice,currency:meta("product:price:currency")||"BRL",url:meta("og:url")||base,imageUrl:absolute(meta("og:image"),base),store});
+  for(const heading of html.matchAll(/<h[12][^>]*>([\s\S]*?)<\/h[12]>/gi)){const title=cleanHtml(heading[1]);if(title.length<3)continue;const start=heading.index||0,before=html.slice(Math.max(0,start-3500),start),after=html.slice(start,Math.min(html.length,start+3500)),priceMatch=after.match(/R\$\s*([0-9.]+,[0-9]{2})/i);if(!priceMatch)continue;const links=[...before.matchAll(/<a[^>]+href=["']([^"']+)["']/gi)],link=links.at(-1)?.[1],images=[...before.matchAll(/<img[^>]+(?:src|data-src)=["']([^"']+)["']/gi)],image=images.at(-1)?.[1],price=number(priceMatch[1]);if(link&&Number.isFinite(price)&&price>0)results.push({title,price,currency:"BRL",url:absolute(link,base)||base,imageUrl:absolute(image,base),store})}
   return results;
 }
 async function collect(url,store,query,direct=false){try{const page=await download(url),items=structuredProducts(page.html,page.url,store).filter(item=>item.currency==="BRL"||!item.currency).map(item=>({...item,match:score(query,item.title)}));return items.filter(item=>direct||item.match>=.45)}catch(error){return[{error:`${store}: ${error.message}`,store}]}}
