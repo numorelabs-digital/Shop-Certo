@@ -9,11 +9,15 @@ const headers={"user-agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 
 const stores={
   Mercado:[
     ["Carrefour",q=>`https://mercado.carrefour.com.br/busca/${encodeURIComponent(q)}`],
+    ["Extra Mercado",q=>`https://www.extramercado.com.br/busca?q=${encodeURIComponent(q)}`],
     ["Pão de Açúcar",q=>`https://www.paodeacucar.com/busca?q=${encodeURIComponent(q)}`],
     ["Atacadão",q=>`https://www.atacadao.com.br/catalogsearch/result/?q=${encodeURIComponent(q)}`],
     ["Tenda Atacado",q=>`https://www.tendaatacado.com.br/busca?q=${encodeURIComponent(q)}`],
     ["Sonda",q=>`https://www.sondadelivery.com.br/delivery/busca/${encodeURIComponent(q)}`],
-    ["Savegnago",q=>`https://www.savegnago.com.br/busca?q=${encodeURIComponent(q)}`]
+    ["Savegnago",q=>`https://www.savegnago.com.br/busca?q=${encodeURIComponent(q)}`],
+    ["Pague Menos",q=>`https://www.superpaguemenos.com.br/busca?q=${encodeURIComponent(q)}`],
+    ["Coop",q=>`https://www.coopsupermercado.com.br/busca?q=${encodeURIComponent(q)}`],
+    ["Spani",q=>`https://www.spanionline.com.br/busca?q=${encodeURIComponent(q)}`]
   ],
   Hogar:[
     ["Magalu",q=>`https://www.magazineluiza.com.br/busca/${encodeURIComponent(q)}/`],
