@@ -38,6 +38,9 @@ type Product = {
   refreshRequestedAt?: unknown;
   createdAt?: unknown;
 };
+type ShoppingList={id:string;name:string;productIds:string[];createdAt?:unknown};
+type PriceAlert={id:string;productId:string;productName:string;type:"price_drop"|"target_price";threshold?:number;active:boolean;createdAt?:unknown};
+type AlertEvent={id:string;alertId:string;productId:string;productName:string;message:string;price:number;store?:string;offerUrl?:string;createdAt?:unknown};
 type Offer = {
   id: string;
   product: string;
@@ -98,9 +101,14 @@ function ShopApp() {
   const [user, setUser] = useState<User | null>(null),
     [tab, setTab] = useState<Tab>("inicio"),
     [products, setProducts] = useState<Product[]>([]),
+    [lists,setLists]=useState<ShoppingList[]>([]),
+    [alerts,setAlerts]=useState<PriceAlert[]>([]),
+    [alertEvents,setAlertEvents]=useState<AlertEvent[]>([]),
     [segment, setSegment] = useState<"Todos" | "Mercado" | "Hogar">("Todos"),
     [open, setOpen] = useState(false),
     [preferencesOpen, setPreferencesOpen] = useState(false),
+    [listOpen,setListOpen]=useState(false),
+    [alertOpen,setAlertOpen]=useState(false),
     [location, setLocation] = useState("São Paulo, SP"),
     [radius, setRadius] = useState(10),
     [toast, setToast] = useState("");
@@ -136,6 +144,7 @@ function ShopApp() {
         setProducts(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Product)),
     );
   }, [user]);
+  useEffect(()=>{if(!user){setLists([]);setAlerts([]);setAlertEvents([]);return}const stopLists=onSnapshot(query(collection(db,"users",user.uid,"lists"),orderBy("createdAt","desc")),s=>setLists(s.docs.map(d=>({id:d.id,...d.data()}as ShoppingList)))),stopAlerts=onSnapshot(query(collection(db,"users",user.uid,"alerts"),orderBy("createdAt","desc")),s=>setAlerts(s.docs.map(d=>({id:d.id,...d.data()}as PriceAlert)))),stopEvents=onSnapshot(query(collection(db,"users",user.uid,"alertEvents"),orderBy("createdAt","desc")),s=>setAlertEvents(s.docs.map(d=>({id:d.id,...d.data()}as AlertEvent))));return()=>{stopLists();stopAlerts();stopEvents()}},[user]);
   useEffect(() => {
     if (!user) return;
     return onSnapshot(doc(db, "users", user.uid), (snapshot) => {
@@ -224,7 +233,7 @@ function ShopApp() {
             <div className="cards">
               {visibleProducts.map((p) => <ProductOfferCard key={p.id} product={p} remove={() => user && deleteDoc(doc(db,"users",user.uid,"products",p.id))} />)}
             </div>
-            {!visibleProducts.length ? <Empty icon="＋" text={segment === "Todos" ? "Adicione seu primeiro produto para começar a comparar preços." : `Ainda não há produtos em ${segment}.`} /> : <div className="saving">✨ <span><b>Economia encontrada</b><small>{money(savings)} comparando seus produtos</small></span></div>}
+            {!visibleProducts.length ? <Empty icon="＋" text={segment === "Todos" ? "Adicione seu primeiro produto para começar a comparar preços." : `Ainda não há produtos em ${segment}.`} action={()=>setOpen(true)} /> : <div className="saving">✨ <span><b>Economia encontrada</b><small>{money(savings)} comparando seus produtos</small></span></div>}
           </>
         )}
         {tab === "guardados" && (
@@ -272,10 +281,8 @@ function ShopApp() {
               title="Minhas listas"
               sub="Organize os produtos que vai comprar"
             />
-            <Empty
-              icon="☷"
-              text="As listas estarão disponíveis na próxima atualização gratuita."
-            />
+            {lists.length ? <div className="list-cards">{lists.map(list=><article className="list-card" key={list.id}><header><span><small>LISTA</small><b>{list.name}</b></span><button onClick={()=>user&&deleteDoc(doc(db,"users",user.uid,"lists",list.id))} aria-label={`Eliminar ${list.name}`}>×</button></header><div>{products.filter(p=>list.productIds.includes(p.id)).map(p=><span className="list-product" key={p.id}>{p.imageUrl?<img src={p.imageUrl} alt=""/>:<i>{p.category==="Mercado"?"🛒":"🏠"}</i>}<b>{p.name}</b><small>{p.brand}</small></span>)}</div></article>)}</div>:<Empty icon="☷" text="Crie uma lista com os produtos que pretende comprar." action={()=>products.length?setListOpen(true):setOpen(true)} />}
+            <button className="section-add" onClick={()=>products.length?setListOpen(true):setOpen(true)}>＋ {products.length?"Nova lista":"Adicionar produto primeiro"}</button>
           </>
         )}
         {tab === "alertas" && (
@@ -285,10 +292,9 @@ function ShopApp() {
               title="Alertas"
               sub="Quedas de preço e ofertas"
             />
-            <Empty
-              icon="🔔"
-              text="Salve um produto para criar seu primeiro alerta."
-            />
+            {alertEvents.length>0&&<section className="alert-history"><h3>Novidades detectadas</h3>{alertEvents.map(event=><a key={event.id} href={event.offerUrl||undefined} target={event.offerUrl?"_blank":undefined} rel="noreferrer"><i>↓</i><span><b>{event.productName}</b><small>{event.message}{event.store?` · ${event.store}`:""}</small></span><strong>{money(event.price)}</strong></a>)}</section>}
+            {alerts.length?<div className="alert-cards">{alerts.map(alert=><article className="alert-card" key={alert.id}><i>🔔</i><span><b>{alert.productName}</b><small>{alert.type==="price_drop"?"Avisar quando o preço baixar":`Avisar quando chegar a ${money(alert.threshold||0)}`}</small></span><em>Ativo</em><button onClick={()=>user&&deleteDoc(doc(db,"users",user.uid,"alerts",alert.id))} aria-label={`Eliminar alerta de ${alert.productName}`}>×</button></article>)}</div>:<Empty icon="🔔" text={products.length?"Crie um alerta para saber quando o preço baixar.":"Adicione um produto para criar seu primeiro alerta."} action={()=>products.length?setAlertOpen(true):setOpen(true)} />}
+            <button className="section-add" onClick={()=>products.length?setAlertOpen(true):setOpen(true)}>＋ {products.length?"Novo alerta":"Adicionar produto primeiro"}</button>
           </>
         )}
         {tab === "perfil" && (
@@ -407,6 +413,8 @@ function ShopApp() {
           }}
         />
       )}
+      {listOpen&&user&&<ListEditor products={products} close={()=>setListOpen(false)} save={async(name,productIds)=>{await addDoc(collection(db,"users",user.uid,"lists"),{name,productIds,createdAt:serverTimestamp()});setListOpen(false);notify("Lista criada.")}}/>}
+      {alertOpen&&user&&<AlertEditor products={products} close={()=>setAlertOpen(false)} save={async(value)=>{const product=products.find(p=>p.id===value.productId);if(!product)return;await addDoc(collection(db,"users",user.uid,"alerts"),{...value,productName:product.name,active:true,createdAt:serverTimestamp()});setAlertOpen(false);notify("Alerta ativado.")}}/>}
       {preferencesOpen && user && <Preferences location={location} radius={radius} close={() => setPreferencesOpen(false)} save={async (nextLocation, nextRadius, place) => {await setDoc(doc(db,"users",user.uid),{location:nextLocation,radiusKm:nextRadius,...(place?{latitude:place.latitude,longitude:place.longitude,postalCode:place.postcode||null}:{}),preferencesUpdatedAt:serverTimestamp()},{merge:true});setPreferencesOpen(false);notify("Localização e raio atualizados.");}} />}
       {toast && <div className="toast">✓ {toast}</div>}
     </div>
@@ -457,12 +465,13 @@ function Login({ login }: { login: () => void }) {
     </section>
   );
 }
-function Empty({ icon, text }: { icon: string; text: string }) {
+function Empty({ icon, text, action }: { icon: string; text: string; action?:()=>void }) {
+  const Tag=action?"button":"section";
   return (
-    <section className="empty">
+    <Tag className={`empty ${action?"empty-action":""}`} onClick={action}>
       <i>{icon}</i>
       <p>{text}</p>
-    </section>
+    </Tag>
   );
 }
 function Add({
@@ -542,6 +551,17 @@ function Add({
       </form>
     </div>
   );
+}
+
+function ListEditor({products,close,save}:{products:Product[];close:()=>void;save:(name:string,productIds:string[])=>void}){
+  const [name,setName]=useState(""),[selected,setSelected]=useState<string[]>([]);
+  const toggle=(id:string)=>setSelected(current=>current.includes(id)?current.filter(item=>item!==id):[...current,id]);
+  return <div className="overlay" onMouseDown={e=>e.target===e.currentTarget&&close()}><form className="sheet" onSubmit={e=>{e.preventDefault();if(selected.length)save(name.trim(),selected)}}><header><span><small>NOVA LISTA</small><h2>Planeje sua compra</h2></span><button type="button" onClick={close}>×</button></header><label>Nome da lista<input required value={name} onChange={e=>setName(e.target.value)} placeholder="Ex. Compra da semana"/></label><fieldset className="product-picker"><legend>Escolha os produtos</legend>{products.map(product=><label key={product.id}><input type="checkbox" checked={selected.includes(product.id)} onChange={()=>toggle(product.id)}/><span><b>{product.name}</b><small>{product.brand} · {product.detail}</small></span></label>)}</fieldset><button className="primary" disabled={!selected.length}>Criar lista ({selected.length})</button></form></div>
+}
+
+function AlertEditor({products,close,save}:{products:Product[];close:()=>void;save:(value:{productId:string;type:"price_drop"|"target_price";threshold?:number})=>void}){
+  const [productId,setProductId]=useState(products[0]?.id||""),[type,setType]=useState<"price_drop"|"target_price">("price_drop"),[threshold,setThreshold]=useState("");
+  return <div className="overlay" onMouseDown={e=>e.target===e.currentTarget&&close()}><form className="sheet" onSubmit={e=>{e.preventDefault();save({productId,type,...(type==="target_price"?{threshold:Number(threshold)}:{})})}}><header><span><small>NOVO ALERTA</small><h2>Quando avisar?</h2></span><button type="button" onClick={close}>×</button></header><label>Produto<select value={productId} onChange={e=>setProductId(e.target.value)}>{products.map(product=><option value={product.id} key={product.id}>{product.name} · {product.brand}</option>)}</select></label><div className="alert-types"><button type="button" className={type==="price_drop"?"active":""} onClick={()=>setType("price_drop")}><b>Qualquer queda</b><small>Avisar quando ficar mais barato</small></button><button type="button" className={type==="target_price"?"active":""} onClick={()=>setType("target_price")}><b>Preço desejado</b><small>Defina o valor máximo</small></button></div>{type==="target_price"&&<label>Preço desejado (R$)<input required min="0.01" step="0.01" type="number" value={threshold} onChange={e=>setThreshold(e.target.value)} placeholder="Ex. 19,90"/></label>}<button className="primary">Ativar alerta</button></form></div>
 }
 
 type PlaceSuggestion={label:string;latitude:number;longitude:number;postcode?:string};
