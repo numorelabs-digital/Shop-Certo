@@ -19,16 +19,22 @@ jobs:
       MERCADO_LIVRE_ACCESS_TOKEN: ${{ secrets.MERCADO_LIVRE_ACCESS_TOKEN }}
       AMAZON_PARTNER_TAG: ${{ secrets.AMAZON_PARTNER_TAG }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
           cache-dependency-path: automation/package-lock.json
       - run: npm ci
         working-directory: automation
       - name: Verify Firebase credential
-        run: test -n "$FIREBASE_SERVICE_ACCOUNT" || (echo "Missing FIREBASE_SERVICE_ACCOUNT_SHOPCERTO secret" && exit 1)
+        shell: bash
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error title=Firebase credential missing::Create the repository secret FIREBASE_SERVICE_ACCOUNT_SHOPCERTO with the complete service-account JSON."
+            exit 1
+          fi
+          node -e 'try { const value=JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT); if(!value.project_id || !value.private_key || !value.client_email) throw new Error("required fields missing"); console.log("Firebase credential format is valid"); } catch(error) { console.error("::error title=Invalid Firebase credential::The FIREBASE_SERVICE_ACCOUNT_SHOPCERTO secret is not a complete valid service-account JSON ("+error.message+")"); process.exit(1); }'
       - name: Process price requests and alerts
         run: node refresh-prices.mjs
         working-directory: automation
