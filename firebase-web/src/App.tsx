@@ -26,6 +26,8 @@ type Product = {
   brand: string;
   category: string;
   detail: string;
+  sourceUrl?: string;
+  sourceStore?: string;
   imageUrl?: string;
   imageSource?: string;
   bestPrice?: number;
@@ -256,7 +258,7 @@ function ShopApp() {
                     <span>
                       <b>{p.name}</b>
                       <small>
-                        {p.brand} · {p.detail}
+                        {[p.brand,p.detail].filter(Boolean).join(" · ")}
                       </small>
                     </span>
                     <button
@@ -412,7 +414,7 @@ function ShopApp() {
               refreshRequestedAt: serverTimestamp(),
               createdAt: serverTimestamp(),
             });
-            await setDoc(doc(db, "priceRequests", `${user.uid}_${productRef.id}`), {userId:user.uid,productId:productRef.id,name:p.name,brand:p.brand,category:p.category,status:"pending",requestedAt:serverTimestamp()});
+            await setDoc(doc(db, "priceRequests", `${user.uid}_${productRef.id}`), {userId:user.uid,productId:productRef.id,name:p.name,brand:p.brand,category:p.category,sourceUrl:p.sourceUrl||null,sourceStore:p.sourceStore||null,status:"pending",requestedAt:serverTimestamp()});
             setOpen(false);
             notify("Produto salvo. As ofertas aparecerão em até 5 minutos.");
           }}
@@ -452,7 +454,7 @@ function ProductOfferCard({ product, remove }: { product: Product; remove: () =>
         <span>
           <em>{product.category}</em>
           <b>{product.name}</b>
-          <small>{product.brand} · {product.detail}</small>
+          <small>{[product.brand,product.detail].filter(Boolean).join(" · ")}</small>
         </span>
         <button className="remove-product" onClick={remove} aria-label={`Eliminar ${product.name}`}>×</button>
       </div>
@@ -493,13 +495,14 @@ function Add({
   close: () => void;
   save: (p: Omit<Product, "id">) => void;
 }) {
-  const [name, setName] = useState(""),
-    [brand, setBrand] = useState(""),
-    [category, setCategory] = useState("Mercado"),
-    [detail, setDetail] = useState("");
+  const [mode,setMode]=useState<"description"|"link">("description"),
+    [description,setDescription]=useState(""),
+    [link,setLink]=useState(""),
+    [category, setCategory] = useState("Mercado");
   function submit(e: FormEvent) {
     e.preventDefault();
-    save({ name, brand, category, detail });
+    if(mode==="description")return save({name:description.trim(),brand:"",category,detail:"Busca ampla por descrição"});
+    try{const url=new URL(link.trim()),host=url.hostname.replace(/^www\./,"").split(".")[0],segments=url.pathname.split("/").filter(Boolean),raw=[...segments].reverse().find(segment=>segment.length>8&&!/^(dp|produto|product|p|item)$/i.test(segment))||host,name=decodeURIComponent(raw).replace(/[-_+]+/g," ").replace(/\b\w/g,char=>char.toUpperCase()).slice(0,90),store=host.charAt(0).toUpperCase()+host.slice(1);save({name,brand:"",category,detail:`Link de ${store}`,sourceUrl:url.toString(),sourceStore:store})}catch{return}
   }
   return (
     <div
@@ -516,6 +519,7 @@ function Add({
             ×
           </button>
         </header>
+        <div className="add-modes"><button type="button" className={mode==="description"?"active":""} onClick={()=>setMode("description")}><b>Descrever produto</b><small>Uma frase é suficiente</small></button><button type="button" className={mode==="link"?"active":""} onClick={()=>setMode("link")}><b>Colar link</b><small>Importar da loja</small></button></div>
         <div className="categories">
           <button
             type="button"
@@ -532,34 +536,8 @@ function Add({
             🏠 Casa e eletro
           </button>
         </div>
-        <label>
-          Nome
-          <input
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Ex. Café torrado"
-          />
-        </label>
-        <label>
-          Marca
-          <input
-            required
-            value={brand}
-            onChange={(e) => setBrand(e.target.value)}
-            placeholder="Ex. Pilão"
-          />
-        </label>
-        <label>
-          Apresentação ou modelo
-          <input
-            required
-            value={detail}
-            onChange={(e) => setDetail(e.target.value)}
-            placeholder="Ex. pacote 500 g"
-          />
-        </label>
-        <button className="primary">Salvar produto</button>
+        {mode==="description"?<label>O que você procura?<input required value={description} onChange={e=>setDescription(e.target.value)} placeholder="Ex. TV Samsung 55 4K"/><small className="field-help">Usaremos todas as palavras para encontrar produtos equivalentes, sem exigir o modelo exato.</small></label>:<label>Link do produto<input required type="url" value={link} onChange={e=>setLink(e.target.value)} placeholder="https://loja.com.br/produto..."/><small className="field-help">O nome, a loja e a referência serão preparados automaticamente.</small></label>}
+        <button className="primary">Adicionar e buscar ofertas</button>
       </form>
     </div>
   );
