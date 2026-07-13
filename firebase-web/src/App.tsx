@@ -34,6 +34,8 @@ type Product = {
   store?: string;
   offerUrl?: string;
   offersCount?: number;
+  priceStatus?: "queued" | "checking" | "ready" | "no_offer";
+  refreshRequestedAt?: unknown;
   createdAt?: unknown;
 };
 type Offer = {
@@ -96,6 +98,7 @@ function ShopApp() {
   const [user, setUser] = useState<User | null>(null),
     [tab, setTab] = useState<Tab>("inicio"),
     [products, setProducts] = useState<Product[]>([]),
+    [segment, setSegment] = useState<"Todos" | "Mercado" | "Hogar">("Todos"),
     [open, setOpen] = useState(false),
     [toast, setToast] = useState("");
   useEffect(
@@ -131,6 +134,7 @@ function ShopApp() {
     );
   }, [user]);
   const savings = useMemo(() => products.reduce((n, p) => n + Math.max(0, (p.oldPrice || p.bestPrice || 0) - (p.bestPrice || 0)), 0), [products]);
+  const visibleProducts = useMemo(() => products.filter((p) => segment === "Todos" || p.category === segment), [products, segment]);
   const notify = (s: string) => {
     setToast(s);
     setTimeout(() => setToast(""), 2600);
@@ -186,30 +190,30 @@ function ShopApp() {
               </button>
             </section>
             <section className="quick">
-              <article>
+              <button className={segment === "Mercado" ? "active" : ""} onClick={() => setSegment(segment === "Mercado" ? "Todos" : "Mercado")}>
                 🛒
                 <span>
                   <b>Supermercado</b>
-                  <small>Ofertas na sua região</small>
+                  <small>{products.filter((p) => p.category === "Mercado").length} produtos guardados</small>
                 </span>
-              </article>
-              <article>
+              </button>
+              <button className={segment === "Hogar" ? "active" : ""} onClick={() => setSegment(segment === "Hogar" ? "Todos" : "Hogar")}>
                 🏠
                 <span>
                   <b>Casa e eletro</b>
-                  <small>Envio para todo Brasil</small>
+                  <small>{products.filter((p) => p.category === "Hogar").length} produtos guardados</small>
                 </span>
-              </article>
+              </button>
             </section>
             <Title
               over="ATUALIZADO DIARIAMENTE"
               title="Melhores ofertas dos seus produtos"
-              sub={`${products.length} produtos acompanhados`}
+              sub={`${visibleProducts.length} produtos ${segment === "Todos" ? "acompanhados" : `em ${segment}`}`}
             />
             <div className="cards">
-              {products.map((p) => <ProductOfferCard key={p.id} product={p} remove={() => user && deleteDoc(doc(db,"users",user.uid,"products",p.id))} />)}
+              {visibleProducts.map((p) => <ProductOfferCard key={p.id} product={p} remove={() => user && deleteDoc(doc(db,"users",user.uid,"products",p.id))} />)}
             </div>
-            {!products.length ? <Empty icon="＋" text="Adicione seu primeiro produto para começar a comparar preços." /> : <div className="saving">✨ <span><b>Economia encontrada</b><small>{money(savings)} comparando seus produtos</small></span></div>}
+            {!visibleProducts.length ? <Empty icon="＋" text={segment === "Todos" ? "Adicione seu primeiro produto para começar a comparar preços." : `Ainda não há produtos em ${segment}.`} /> : <div className="saving">✨ <span><b>Economia encontrada</b><small>{money(savings)} comparando seus produtos</small></span></div>}
           </>
         )}
         {tab === "guardados" && (
@@ -379,13 +383,16 @@ function ShopApp() {
           save={async (p) => {
             if (!user) return;
             const image = await findProductImage(p.name, p.brand, p.category);
-            await addDoc(collection(db, "users", user.uid, "products"), {
+            const productRef = await addDoc(collection(db, "users", user.uid, "products"), {
               ...p,
               ...(image || {}),
+              priceStatus: "queued",
+              refreshRequestedAt: serverTimestamp(),
               createdAt: serverTimestamp(),
             });
+            await setDoc(doc(db, "priceRequests", `${user.uid}_${productRef.id}`), {userId:user.uid,productId:productRef.id,name:p.name,brand:p.brand,category:p.category,status:"pending",requestedAt:serverTimestamp()});
             setOpen(false);
-            notify("Produto salvo no seu perfil");
+            notify("Produto salvo. As ofertas aparecerão em até 5 minutos.");
           }}
         />
       )}
@@ -424,7 +431,7 @@ function ProductOfferCard({ product, remove }: { product: Product; remove: () =>
         </span>
         <button className="remove-product" onClick={remove} aria-label={`Eliminar ${product.name}`}>×</button>
       </div>
-      {product.bestPrice && product.offerUrl ? <a className="offer-link" href={product.offerUrl} target="_blank" rel="noreferrer"><div className="price"><small>Melhor preço</small><b>{money(product.bestPrice)}</b>{product.oldPrice && <del>{money(product.oldPrice)}</del>}{drop > 0 && <em>↓ {drop}%</em>}</div><footer><span>{product.store || "Loja verificada"}</span><b>Total {money(total)} · Abrir oferta ›</b></footer></a> : <div className="offer-pending"><i></i><span><b>Buscando ofertas</b><small>Este produto entrará en la próxima revisión de precios.</small></span></div>}
+      {product.bestPrice && product.offerUrl ? <a className="offer-link" href={product.offerUrl} target="_blank" rel="noreferrer"><div className="price"><small>Melhor preço</small><b>{money(product.bestPrice)}</b>{product.oldPrice && <del>{money(product.oldPrice)}</del>}{drop > 0 && <em>↓ {drop}%</em>}</div><footer><span>{product.store || "Loja verificada"}</span><b>Total {money(total)} · Abrir oferta ›</b></footer></a> : <div className="offer-pending"><i></i><span><b>Buscando ofertas</b><small>Primeiros resultados em até 5 minutos. Depois, atualização diária.</small></span></div>}
     </article>
   );
 }
