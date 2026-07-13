@@ -28,6 +28,12 @@ type Product = {
   detail: string;
   imageUrl?: string;
   imageSource?: string;
+  bestPrice?: number;
+  oldPrice?: number;
+  shipping?: number;
+  store?: string;
+  offerUrl?: string;
+  offersCount?: number;
   createdAt?: unknown;
 };
 type Offer = {
@@ -90,7 +96,6 @@ function ShopApp() {
   const [user, setUser] = useState<User | null>(null),
     [tab, setTab] = useState<Tab>("inicio"),
     [products, setProducts] = useState<Product[]>([]),
-    [offers, setOffers] = useState<Offer[]>([]),
     [open, setOpen] = useState(false),
     [toast, setToast] = useState("");
   useEffect(
@@ -112,12 +117,6 @@ function ShopApp() {
     [],
   );
   useEffect(() => {
-    getDocs(collection(db, "offers")).then((s) => {
-      if (!s.empty)
-        setOffers(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Offer));
-    });
-  }, []);
-  useEffect(() => {
     if (!user) {
       setProducts([]);
       return;
@@ -131,14 +130,7 @@ function ShopApp() {
         setProducts(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Product)),
     );
   }, [user]);
-  const savings = useMemo(
-    () =>
-      offers.reduce(
-        (n, o) => n + Math.max(0, (o.oldPrice || o.price) - o.price),
-        0,
-      ),
-    [offers],
-  );
+  const savings = useMemo(() => products.reduce((n, p) => n + Math.max(0, (p.oldPrice || p.bestPrice || 0) - (p.bestPrice || 0)), 0), [products]);
   const notify = (s: string) => {
     setToast(s);
     setTimeout(() => setToast(""), 2600);
@@ -211,21 +203,13 @@ function ShopApp() {
             </section>
             <Title
               over="ATUALIZADO DIARIAMENTE"
-              title="Melhores ofertas"
-              sub={`${offers.length} ofertas disponíveis`}
+              title="Melhores ofertas dos seus produtos"
+              sub={`${products.length} produtos acompanhados`}
             />
             <div className="cards">
-              {offers.map((o) => (
-                <OfferCard key={o.id} o={o} />
-              ))}
+              {products.map((p) => <ProductOfferCard key={p.id} product={p} remove={() => user && deleteDoc(doc(db,"users",user.uid,"products",p.id))} />)}
             </div>
-            <div className="saving">
-              ✨{" "}
-              <span>
-                <b>Economia encontrada</b>
-                <small>{money(savings)} comparando os preços atuais</small>
-              </span>
-            </div>
+            {!products.length ? <Empty icon="＋" text="Adicione seu primeiro produto para começar a comparar preços." /> : <div className="saving">✨ <span><b>Economia encontrada</b><small>{money(savings)} comparando seus produtos</small></span></div>}
           </>
         )}
         {tab === "guardados" && (
@@ -426,30 +410,21 @@ function Title({
     </div>
   );
 }
-function OfferCard({ o }: { o: Offer }) {
-  const total = o.price + (o.shipping || 0),
-    drop = o.oldPrice ? Math.round((1 - o.price / o.oldPrice) * 100) : 0;
+function ProductOfferCard({ product, remove }: { product: Product; remove: () => void }) {
+  const total = (product.bestPrice || 0) + (product.shipping || 0),
+    drop = product.oldPrice && product.bestPrice ? Math.round((1 - product.bestPrice / product.oldPrice) * 100) : 0;
   return (
-    <article className="offer">
+    <article className={`offer ${product.bestPrice ? "has-offer" : "waiting-offer"}`}>
       <div className="offer-top">
-        <div className="pic">{o.product.includes("TV") ? "📺" : "☕"}</div>
+        <div className="pic">{product.imageUrl ? <img src={product.imageUrl} alt={product.name} /> : product.category === "Mercado" ? "🛒" : "🏠"}</div>
         <span>
-          <em>{o.scope}</em>
-          <b>{o.product}</b>
-          <small>{o.brand}</small>
+          <em>{product.category}</em>
+          <b>{product.name}</b>
+          <small>{product.brand} · {product.detail}</small>
         </span>
-        <i>♡</i>
+        <button className="remove-product" onClick={remove} aria-label={`Eliminar ${product.name}`}>×</button>
       </div>
-      <div className="price">
-        <small>Melhor preço</small>
-        <b>{money(o.price)}</b>
-        {o.oldPrice && <del>{money(o.oldPrice)}</del>}
-        <em>↓ {drop}%</em>
-      </div>
-      <footer>
-        <span>{o.store}</span>
-        <b>Total {money(total)}</b>
-      </footer>
+      {product.bestPrice && product.offerUrl ? <a className="offer-link" href={product.offerUrl} target="_blank" rel="noreferrer"><div className="price"><small>Melhor preço</small><b>{money(product.bestPrice)}</b>{product.oldPrice && <del>{money(product.oldPrice)}</del>}{drop > 0 && <em>↓ {drop}%</em>}</div><footer><span>{product.store || "Loja verificada"}</span><b>Total {money(total)} · Abrir oferta ›</b></footer></a> : <div className="offer-pending"><i></i><span><b>Buscando ofertas</b><small>Este produto entrará en la próxima revisión de precios.</small></span></div>}
     </article>
   );
 }
