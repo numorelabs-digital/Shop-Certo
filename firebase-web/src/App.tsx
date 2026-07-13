@@ -159,6 +159,7 @@ function ShopApp() {
   }, [user]);
   const savings = useMemo(() => products.reduce((n, p) => n + Math.max(0, (p.oldPrice || p.bestPrice || 0) - (p.bestPrice || 0)), 0), [products]);
   const visibleProducts = useMemo(() => products.filter((p) => segment === "Todos" || p.category === segment), [products, segment]);
+  const compactLocation=useMemo(()=>{const parts=location.split(",").map(part=>part.trim()).filter(Boolean),city=parts.find(part=>/^são paulo$/i.test(part));if(city)return"São Paulo, SP";const useful=parts.filter(part=>!/^\d{5}-?\d{3}$/.test(part)&&!/linha|estação/i.test(part));return useful.slice(-2).join(", ")||"Localização"},[location]);
   const notify = (s: string) => {
     setToast(s);
     setTimeout(() => setToast(""), 2600);
@@ -180,10 +181,10 @@ function ShopApp() {
     <div className="app">
       <header>
         <a className="brand" onClick={() => setTab("inicio")}>
-          <img src="/shopcerto-logo.png" alt="ShopCerto" />
+          <span className="brand-icon"><img src="/shopcerto-logo.png" alt="" /></span><strong>Shop<span>Certo</span></strong>
         </a>
-        <button className="place" onClick={() => setPreferencesOpen(true)}>
-          ⌖ {location}
+        <button className="place" title={location} onClick={() => setPreferencesOpen(true)}>
+          <i>⌖</i><span>{compactLocation}</span>
         </button>
         <button className="avatar" onClick={() => setTab("perfil")}>
           {user?.photoURL ? (
