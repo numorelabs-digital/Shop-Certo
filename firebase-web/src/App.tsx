@@ -26,6 +26,8 @@ type Product = {
   brand: string;
   category: string;
   detail: string;
+  imageUrl?: string;
+  imageSource?: string;
   createdAt?: unknown;
 };
 type Offer = {
@@ -39,6 +41,25 @@ type Offer = {
   scope: string;
   updatedAt?: unknown;
 };
+
+async function findProductImage(name: string, brand: string, category: string) {
+  if (category !== "Mercado") return null;
+  try {
+    const url = new URL("https://world.openfoodfacts.org/api/v2/search");
+    url.searchParams.set("q", `${name} ${brand}`);
+    url.searchParams.set("page_size", "8");
+    url.searchParams.set("fields", "product_name,brands,image_front_url,image_url");
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const data = (await response.json()) as { products?: Array<{ brands?: string; image_front_url?: string; image_url?: string }> };
+    const wanted = brand.toLocaleLowerCase("pt-BR");
+    const match = data.products?.find((p) => p.brands?.toLocaleLowerCase("pt-BR").includes(wanted) && (p.image_front_url || p.image_url));
+    const imageUrl = match?.image_front_url || match?.image_url;
+    return imageUrl ? { imageUrl, imageSource: "Open Food Facts" } : null;
+  } catch {
+    return null;
+  }
+}
 const money = (n: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
     n,
@@ -218,7 +239,7 @@ function ShopApp() {
               <div className="cards">
                 {products.map((p) => (
                   <article className="product" key={p.id}>
-                    <div>🛍️</div>
+                    <div>{p.imageUrl ? <img src={p.imageUrl} alt={p.name} /> : "🛍️"}</div>
                     <span>
                       <b>{p.name}</b>
                       <small>
@@ -373,8 +394,10 @@ function ShopApp() {
           close={() => setOpen(false)}
           save={async (p) => {
             if (!user) return;
+            const image = await findProductImage(p.name, p.brand, p.category);
             await addDoc(collection(db, "users", user.uid, "products"), {
               ...p,
+              ...(image || {}),
               createdAt: serverTimestamp(),
             });
             setOpen(false);
