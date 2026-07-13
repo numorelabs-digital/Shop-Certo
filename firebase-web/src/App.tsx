@@ -8,6 +8,7 @@ import {
 } from "firebase/auth";
 import {
   addDoc,
+  arrayUnion,
   collection,
   deleteDoc,
   doc,
@@ -20,6 +21,8 @@ import {
 } from "firebase/firestore";
 import { auth, db, googleProvider } from "./firebase";
 type Tab = "inicio" | "guardados" | "listas" | "alertas" | "perfil";
+type ProductSource={url:string;store:string;title?:string;imageUrl?:string;addedAt?:string};
+type SourceOffer={url:string;store:string;title:string;price:number;shipping?:number;imageUrl?:string};
 type Product = {
   id: string;
   name: string;
@@ -28,6 +31,8 @@ type Product = {
   detail: string;
   sourceUrl?: string;
   sourceStore?: string;
+  sources?:ProductSource[];
+  sourceOffers?:SourceOffer[];
   imageUrl?: string;
   imageSource?: string;
   bestPrice?: number;
@@ -118,6 +123,7 @@ function ShopApp() {
     [preferencesOpen, setPreferencesOpen] = useState(false),
     [listOpen,setListOpen]=useState(false),
     [alertOpen,setAlertOpen]=useState(false),
+    [detailProductId,setDetailProductId]=useState<string|null>(null),
     [location, setLocation] = useState("São Paulo, SP"),
     [postalCode,setPostalCode]=useState(""),
     [street,setStreet]=useState(""),
@@ -245,7 +251,7 @@ function ShopApp() {
               sub={`${visibleProducts.length} produtos ${segment === "Todos" ? "acompanhados" : `em ${segment}`}`}
             />
             <div className="cards">
-              {visibleProducts.map((p) => <ProductOfferCard key={p.id} product={p} remove={() => user && deleteDoc(doc(db,"users",user.uid,"products",p.id))} />)}
+              {visibleProducts.map((p) => <ProductOfferCard key={p.id} product={p} open={()=>setDetailProductId(p.id)} remove={() => user && deleteDoc(doc(db,"users",user.uid,"products",p.id))} />)}
             </div>
             {!visibleProducts.length ? <Empty icon="＋" text={segment === "Todos" ? "Adicione seu primeiro produto para começar a comparar preços." : `Ainda não há produtos em ${segment}.`} action={()=>setOpen(true)} /> : <div className="saving">✨ <span><b>Economia encontrada</b><small>{money(savings)} comparando seus produtos</small></span></div>}
           </>
@@ -430,6 +436,7 @@ function ShopApp() {
       {listOpen&&user&&<ListEditor products={products} close={()=>setListOpen(false)} save={async(name,productIds)=>{await addDoc(collection(db,"users",user.uid,"lists"),{name,productIds,createdAt:serverTimestamp()});setListOpen(false);notify("Lista criada.")}}/>}
       {alertOpen&&user&&<AlertEditor products={products} close={()=>setAlertOpen(false)} save={async(value)=>{const product=products.find(p=>p.id===value.productId);if(!product)return;await addDoc(collection(db,"users",user.uid,"alerts"),{...value,productName:product.name,active:true,createdAt:serverTimestamp()});setAlertOpen(false);notify("Alerta ativado.")}}/>}
       {preferencesOpen && user && <Preferences location={location} postalCode={postalCode} street={street} radius={radius} close={() => setPreferencesOpen(false)} save={async (nextLocation,nextPostalCode,nextStreet,nextRadius,place) => {await setDoc(doc(db,"users",user.uid),{location:nextLocation,postalCode:nextPostalCode,street:nextStreet,radiusKm:nextRadius,...(place?{latitude:place.latitude,longitude:place.longitude}:{}),preferencesUpdatedAt:serverTimestamp()},{merge:true});setPreferencesOpen(false);notify("Endereço e raio atualizados.");}} />}
+      {detailProductId&&user&&products.find(p=>p.id===detailProductId)&&<ProductDetail product={products.find(p=>p.id===detailProductId)!} close={()=>setDetailProductId(null)} addSource={async source=>{const product=products.find(p=>p.id===detailProductId);if(!product)return;await setDoc(doc(db,"users",user.uid,"products",product.id),{sources:arrayUnion(source),priceStatus:"queued",refreshRequestedAt:serverTimestamp()},{merge:true});await setDoc(doc(db,"priceRequests",`${user.uid}_${product.id}`),{userId:user.uid,productId:product.id,name:product.name,brand:product.brand,category:product.category,status:"pending",requestedAt:serverTimestamp()},{merge:true});notify("Link adicionado à comparação.")}}/>}
       {toast && <div className="toast">✓ {toast}</div>}
     </div>
   );
@@ -451,11 +458,11 @@ function Title({
     </div>
   );
 }
-function ProductOfferCard({ product, remove }: { product: Product; remove: () => void }) {
+function ProductOfferCard({ product, remove, open }: { product: Product; remove: () => void;open:()=>void }) {
   const total = (product.bestPrice || 0) + (product.shipping || 0),
     drop = product.oldPrice && product.bestPrice ? Math.round((1 - product.bestPrice / product.oldPrice) * 100) : 0;
   return (
-    <article className={`offer ${product.bestPrice ? "has-offer" : "waiting-offer"}`}>
+    <article className={`offer product-clickable ${product.bestPrice ? "has-offer" : "waiting-offer"}`} role="button" tabIndex={0} onClick={open} onKeyDown={e=>(e.key==="Enter"||e.key===" ")&&open()}>
       <div className="offer-top">
         <div className="pic">{product.imageUrl ? <img src={product.imageUrl} alt={product.name} /> : product.category === "Mercado" ? "🛒" : "🏠"}</div>
         <span>
@@ -463,9 +470,9 @@ function ProductOfferCard({ product, remove }: { product: Product; remove: () =>
           <b>{product.name}</b>
           <small>{[product.brand,product.detail].filter(Boolean).join(" · ")}</small>
         </span>
-        <button className="remove-product" onClick={remove} aria-label={`Eliminar ${product.name}`}>×</button>
+        <button className="remove-product" onClick={e=>{e.stopPropagation();remove()}} aria-label={`Eliminar ${product.name}`}>×</button>
       </div>
-      {product.bestPrice && product.offerUrl ? <a className="offer-link" href={product.offerUrl} target="_blank" rel="noreferrer"><div className="price"><small>Melhor preço</small><b>{money(product.bestPrice)}</b>{product.oldPrice && <del>{money(product.oldPrice)}</del>}{drop > 0 && <em>↓ {drop}%</em>}</div><footer><span>{product.store || "Loja verificada"}</span><b>Total {money(total)} · Abrir oferta ›</b></footer></a> : <OfferCountdown requestedAt={product.refreshRequestedAt||product.createdAt} status={product.priceStatus}/>} 
+      {product.bestPrice && product.offerUrl ? <a className="offer-link" href={product.offerUrl} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}><div className="price"><small>Melhor preço</small><b>{money(product.bestPrice)}</b>{product.oldPrice && <del>{money(product.oldPrice)}</del>}{drop > 0 && <em>↓ {drop}%</em>}</div><footer><span>{product.store || "Loja verificada"}</span><b>Total {money(total)} · Abrir oferta ›</b></footer></a> : <OfferCountdown requestedAt={product.refreshRequestedAt||product.createdAt} status={product.priceStatus}/>} 
     </article>
   );
 }
@@ -494,6 +501,13 @@ function Empty({ icon, text, action }: { icon: string; text: string; action?:()=
       <p>{text}</p>
     </Tag>
   );
+}
+function ProductDetail({product,close,addSource}:{product:Product;close:()=>void;addSource:(source:ProductSource)=>Promise<void>}){
+  const [link,setLink]=useState(""),[saving,setSaving]=useState(false),[error,setError]=useState("");
+  const sources=useMemo(()=>{const items:ProductSource[]=[...(product.sourceUrl?[{url:product.sourceUrl,store:product.sourceStore||"Link original",title:product.name,imageUrl:product.imageUrl}]:[]),...(product.sources||[])];return[...new Map(items.map(item=>[item.url,item])).values()]},[product]);
+  const offers=product.sourceOffers||[];
+  async function submit(e:FormEvent){e.preventDefault();setError("");try{const url=new URL(link.trim());if(sources.some(source=>source.url===url.toString())){setError("Este link já está na comparação.");return}setSaving(true);const metadata=await findLinkMetadata(url.toString()),host=url.hostname.replace(/^www\./,"").split(".")[0],store=metadata?.sourceStore||host.charAt(0).toUpperCase()+host.slice(1);await addSource({url:metadata?.resolvedUrl||url.toString(),store,title:metadata?.name,imageUrl:metadata?.imageUrl});setLink("")}catch{setError("O link não é válido.")}finally{setSaving(false)}}
+  return <div className="overlay" onMouseDown={e=>e.target===e.currentTarget&&close()}><section className="sheet product-detail"><header><span><small>COMPARAÇÃO</small><h2>{product.name}</h2></span><button type="button" onClick={close}>×</button></header><div className="detail-summary">{product.imageUrl?<img src={product.imageUrl} alt={product.name}/>:<i>{product.category==="Mercado"?"🛒":"🏠"}</i>}<span><b>{offers.length} preços encontrados</b><small>{sources.length} links acompanhados</small></span></div><div className="source-prices">{sources.map(source=>{const offer=offers.find(item=>item.url===source.url||item.store===source.store);return offer?<a href={offer.url} target="_blank" rel="noreferrer" key={source.url}><span><b>{offer.store}</b><small>{offer.title}</small></span><strong>{money(offer.price)}</strong><em>Abrir ›</em></a>:<article key={source.url}><span><b>{source.store}</b><small>{source.title||"Link adicionado"}</small></span><strong>Monitorando</strong></article>})}{!sources.length&&<p>Nenhum link específico adicionado ainda.</p>}</div><form className="add-source" onSubmit={submit}><label>Adicionar outro link<input required type="url" value={link} onChange={e=>setLink(e.target.value)}/></label>{error&&<small className="source-error">{error}</small>}<button className="primary" disabled={saving}>{saving?"Lendo produto…":"Adicionar à comparação"}</button></form></section></div>
 }
 function Add({
   close,
