@@ -474,7 +474,7 @@ function OfferCountdown({requestedAt,status}:{requestedAt:unknown;status?:Produc
   useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer)},[]);
   const started=timestampMillis(requestedAt),remaining=Math.max(0,started+5*60*1000-now),minutes=Math.floor(remaining/60000),seconds=Math.floor((remaining%60000)/1000),count=`${String(minutes).padStart(2,"0")}:${String(seconds).padStart(2,"0")}`;
   const waiting=!started||remaining===0;
-  return <div className={`offer-pending ${waiting?"offer-delayed":""}`}><i></i><span><b>{waiting?"Aguardando coleta de preços":"Buscando ofertas"}</b><small>{waiting?(status==="checking"||status==="queued"?"A verificação está na fila. Avisaremos assim que houver preços reais.":"Ainda não recebemos preços verificáveis para este produto."):`Tempo estimado restante: ${count}`}</small></span>{!waiting&&<strong>{count}</strong>}</div>
+  return <div className={`offer-pending ${waiting?"offer-delayed":""}`}><i></i><span><b>{waiting?"Monitorando ofertas":"Buscando ofertas"}</b><small>{waiting?(status==="checking"||status==="queued"?"A verificação está na fila e continuará automaticamente.":"Avisaremos automaticamente quando alguma loja publicar uma oferta verificável."):`Tempo estimado restante: ${count}`}</small></span>{!waiting&&<strong>{count}</strong>}</div>
 }
 function Login({ login }: { login: () => void }) {
   return (
