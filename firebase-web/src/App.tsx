@@ -62,24 +62,7 @@ type Offer = {
   updatedAt?: unknown;
 };
 
-async function findProductImage(name: string, brand: string, category: string) {
-  if (category !== "Mercado") return null;
-  try {
-    const url = new URL("https://world.openfoodfacts.org/api/v2/search");
-    url.searchParams.set("q", `${name} ${brand}`);
-    url.searchParams.set("page_size", "8");
-    url.searchParams.set("fields", "product_name,brands,image_front_url,image_url");
-    const response = await fetch(url);
-    if (!response.ok) return null;
-    const data = (await response.json()) as { products?: Array<{ brands?: string; image_front_url?: string; image_url?: string }> };
-    const wanted = brand.toLocaleLowerCase("pt-BR");
-    const match = data.products?.find((p) => p.brands?.toLocaleLowerCase("pt-BR").includes(wanted) && (p.image_front_url || p.image_url));
-    const imageUrl = match?.image_front_url || match?.image_url;
-    return imageUrl ? { imageUrl, imageSource: "Open Food Facts" } : null;
-  } catch {
-    return null;
-  }
-}
+const verifiedImage=(product:Product)=>product.imageSource==="Open Food Facts"?undefined:product.imageUrl;
 async function findLinkMetadata(link:string){
   try{const endpoint=new URL("https://api.microlink.io");endpoint.searchParams.set("url",link);const response=await fetch(endpoint);if(!response.ok)return null;const result=await response.json() as {status?:string;data?:{title?:string;publisher?:string;image?:{url?:string}|string;url?:string}};if(result.status!=="success"||!result.data)return null;const imageUrl=typeof result.data.image==="string"?result.data.image:result.data.image?.url;return{name:result.data.title?.trim(),imageUrl,sourceStore:result.data.publisher?.trim(),resolvedUrl:result.data.url}}catch{return null}
 }
@@ -269,7 +252,7 @@ function ShopApp() {
               <div className="cards">
                 {products.map((p) => (
                   <article className="product" key={p.id}>
-                    <div>{p.imageUrl ? <img src={p.imageUrl} alt={p.name} /> : "🛍️"}</div>
+                    <div>{verifiedImage(p) ? <img src={verifiedImage(p)} alt={p.name} /> : "🛍️"}</div>
                     <span>
                       <b>{p.name}</b>
                       <small>
@@ -303,7 +286,7 @@ function ShopApp() {
               title="Minhas listas"
               sub="Organize os produtos que vai comprar"
             />
-            {lists.length ? <div className="list-cards">{lists.map(list=><article className="list-card" key={list.id}><header><span><small>LISTA</small><b>{list.name}</b></span><button onClick={()=>user&&deleteDoc(doc(db,"users",user.uid,"lists",list.id))} aria-label={`Eliminar ${list.name}`}>×</button></header><div>{products.filter(p=>list.productIds.includes(p.id)).map(p=><span className="list-product" key={p.id}>{p.imageUrl?<img src={p.imageUrl} alt=""/>:<i>{p.category==="Mercado"?"🛒":"🏠"}</i>}<b>{p.name}</b><small>{p.brand}</small></span>)}</div></article>)}</div>:<Empty icon="☷" text="Crie uma lista com os produtos que pretende comprar." action={()=>products.length?setListOpen(true):setOpen(true)} />}
+            {lists.length ? <div className="list-cards">{lists.map(list=><article className="list-card" key={list.id}><header><span><small>LISTA</small><b>{list.name}</b></span><button onClick={()=>user&&deleteDoc(doc(db,"users",user.uid,"lists",list.id))} aria-label={`Eliminar ${list.name}`}>×</button></header><div>{products.filter(p=>list.productIds.includes(p.id)).map(p=><span className="list-product" key={p.id}>{verifiedImage(p)?<img src={verifiedImage(p)} alt=""/>:<i>{p.category==="Mercado"?"🛒":"🏠"}</i>}<b>{p.name}</b><small>{p.brand}</small></span>)}</div></article>)}</div>:<Empty icon="☷" text="Crie uma lista com os produtos que pretende comprar." action={()=>products.length?setListOpen(true):setOpen(true)} />}
             <button className="section-add" onClick={()=>products.length?setListOpen(true):setOpen(true)}>＋ {products.length?"Nova lista":"Adicionar produto primeiro"}</button>
           </>
         )}
@@ -421,10 +404,8 @@ function ShopApp() {
           close={() => setOpen(false)}
           save={async (p) => {
             if (!user) return;
-            const image = p.imageUrl?null:await findProductImage(p.name, p.brand, p.category);
             const productRef = await addDoc(collection(db, "users", user.uid, "products"), {
               ...p,
-              ...(image || {}),
               priceStatus: "queued",
               refreshRequestedAt: serverTimestamp(),
               createdAt: serverTimestamp(),
@@ -466,7 +447,7 @@ function ProductOfferCard({ product, remove, open }: { product: Product; remove:
   return (
     <article className={`offer product-clickable ${product.bestPrice ? "has-offer" : "waiting-offer"}`} role="button" tabIndex={0} onClick={open} onKeyDown={e=>(e.key==="Enter"||e.key===" ")&&open()}>
       <div className="offer-top">
-        <div className="pic">{product.imageUrl ? <img src={product.imageUrl} alt={product.name} /> : product.category === "Mercado" ? "🛒" : "🏠"}</div>
+        <div className="pic">{verifiedImage(product) ? <img src={verifiedImage(product)} alt={product.name} /> : product.category === "Mercado" ? "🛒" : "🏠"}</div>
         <span>
           <em>{product.category}</em>
           <b>{product.name}</b>
@@ -506,10 +487,10 @@ function Empty({ icon, text, action }: { icon: string; text: string; action?:()=
 }
 function ProductDetail({product,close,addSource}:{product:Product;close:()=>void;addSource:(source:ProductSource)=>Promise<void>}){
   const [link,setLink]=useState(""),[saving,setSaving]=useState(false),[error,setError]=useState("");
-  const sources=useMemo(()=>{const items:ProductSource[]=[...(product.sourceUrl?[{url:product.sourceUrl,store:product.sourceStore||"Link original",title:product.name,imageUrl:product.imageUrl}]:[]),...(product.sources||[])];return[...new Map(items.map(item=>[item.url,item])).values()]},[product]);
+  const sources=useMemo(()=>{const items:ProductSource[]=[...(product.sourceUrl?[{url:product.sourceUrl,store:product.sourceStore||"Link original",title:product.name,imageUrl:verifiedImage(product)}]:[]),...(product.sources||[])];return[...new Map(items.map(item=>[item.url,item])).values()]},[product]);
   const offers=product.sourceOffers||[];
   async function submit(e:FormEvent){e.preventDefault();setError("");try{const url=new URL(link.trim());if(sources.some(source=>source.url===url.toString())){setError("Este link já está na comparação.");return}setSaving(true);const metadata=await findLinkMetadata(url.toString()),host=url.hostname.replace(/^www\./,"").split(".")[0],store=metadata?.sourceStore||host.charAt(0).toUpperCase()+host.slice(1);await addSource({url:metadata?.resolvedUrl||url.toString(),store,title:metadata?.name,imageUrl:metadata?.imageUrl});setLink("")}catch{setError("O link não é válido.")}finally{setSaving(false)}}
-  return <div className="overlay" onMouseDown={e=>e.target===e.currentTarget&&close()}><section className="sheet product-detail"><header><span><small>COMPARAÇÃO</small><h2>{product.name}</h2></span><button type="button" onClick={close}>×</button></header><div className="detail-summary">{product.imageUrl?<img src={product.imageUrl} alt={product.name}/>:<i>{product.category==="Mercado"?"🛒":"🏠"}</i>}<span><b>{offers.length} preços encontrados</b><small>{sources.length} links acompanhados</small></span></div><div className="source-prices">{sources.map(source=>{const offer=offers.find(item=>item.url===source.url||item.store===source.store);return offer?<a href={offer.url} target="_blank" rel="noreferrer" key={source.url}><span><b>{offer.store}</b><small>{offer.title}</small></span><strong>{money(offer.price)}</strong><em>Abrir ›</em></a>:<article key={source.url}><span><b>{source.store}</b><small>{source.title||"Link adicionado"}</small></span><strong>Monitorando</strong></article>})}{!sources.length&&<p>Nenhum link específico adicionado ainda.</p>}</div><form className="add-source" onSubmit={submit}><label>Adicionar outro link<input required type="url" value={link} onChange={e=>setLink(e.target.value)}/></label>{error&&<small className="source-error">{error}</small>}<button className="primary" disabled={saving}>{saving?"Lendo produto…":"Adicionar à comparação"}</button></form></section></div>
+  return <div className="overlay" onMouseDown={e=>e.target===e.currentTarget&&close()}><section className="sheet product-detail"><header><span><small>COMPARAÇÃO</small><h2>{product.name}</h2></span><button type="button" onClick={close}>×</button></header><div className="detail-summary">{verifiedImage(product)?<img src={verifiedImage(product)} alt={product.name}/>:<i>{product.category==="Mercado"?"🛒":"🏠"}</i>}<span><b>{offers.length} preços encontrados</b><small>{sources.length} links acompanhados</small></span></div><div className="source-prices">{sources.map(source=>{const offer=offers.find(item=>item.url===source.url||item.store===source.store);return offer?<a href={offer.url} target="_blank" rel="noreferrer" key={source.url}><span><b>{offer.store}</b><small>{offer.title}</small></span><strong>{money(offer.price)}</strong><em>Abrir ›</em></a>:<article key={source.url}><span><b>{source.store}</b><small>{source.title||"Link adicionado"}</small></span><strong>Monitorando</strong></article>})}{!sources.length&&<p>Nenhum link específico adicionado ainda.</p>}</div><form className="add-source" onSubmit={submit}><label>Adicionar outro link<input required type="url" value={link} onChange={e=>setLink(e.target.value)}/></label>{error&&<small className="source-error">{error}</small>}<button className="primary" disabled={saving}>{saving?"Lendo produto…":"Adicionar à comparação"}</button></form></section></div>
 }
 function Add({
   close,

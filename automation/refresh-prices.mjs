@@ -49,6 +49,7 @@ async function collect(url,store,query,direct=false){try{const page=await downlo
 async function updateProduct({userId,productId,requestRef}){
   const productRef=db.doc(`users/${userId}/products/${productId}`),productSnap=await productRef.get();if(!productSnap.exists)return;
   const product=productSnap.data(),user=(await db.doc(`users/${userId}`).get()).data()||{},query=[product.name,product.brand,product.detail==="Busca ampla por descrição"?"":product.detail].filter(Boolean).join(" "),candidates=[],errors=[];
+  if(product.imageSource==="Open Food Facts"){await productRef.set({imageUrl:FieldValue.delete(),imageSource:FieldValue.delete()},{merge:true});product.imageUrl=null;product.imageSource=null}
   await productRef.set({priceStatus:"checking",lastSearchAttemptAt:FieldValue.serverTimestamp()},{merge:true});
   const directSources=[...(product.sourceUrl?[{url:product.sourceUrl,store:product.sourceStore||new URL(product.sourceUrl).hostname}]:[]),...(Array.isArray(product.sources)?product.sources:[])];for(const source of directSources){for(const item of await collect(source.url,source.store||new URL(source.url).hostname,query,true))item.error?errors.push(item.error):candidates.push(item)}
   const adapters=stores[product.category]||stores.Hogar;
