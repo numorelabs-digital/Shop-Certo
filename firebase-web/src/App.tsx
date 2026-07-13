@@ -1,9 +1,11 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
+  browserLocalPersistence,
   deleteUser,
   onAuthStateChanged,
   signInWithPopup,
   signOut,
+  setPersistence,
   User,
 } from "firebase/auth";
 import {
@@ -587,14 +589,20 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null | undefined>(undefined);
   const [authError, setAuthError] = useState("");
 
-  useEffect(() => onAuthStateChanged(auth, setCurrentUser), []);
+  useEffect(() => {
+    setPersistence(auth,browserLocalPersistence).catch(()=>setAuthError("Não foi possível salvar a sessão neste navegador."));
+    return onAuthStateChanged(auth, setCurrentUser);
+  }, []);
 
   async function enterWithGoogle() {
     setAuthError("");
     try {
-      await signInWithPopup(auth, googleProvider);
-    } catch {
-      setAuthError("No pudimos abrir tu cuenta de Google. Revisá los dominios autorizados e intentá nuevamente.");
+      await setPersistence(auth,browserLocalPersistence);
+      const result=await signInWithPopup(auth, googleProvider);
+      setCurrentUser(result.user);
+    } catch(error) {
+      const code=typeof error==="object"&&error&&"code" in error?String((error as {code:unknown}).code):"";
+      setAuthError(code.includes("popup-blocked")?"O navegador bloqueou a janela do Google. Permita pop-ups e tente novamente.":code.includes("cancelled-popup")||code.includes("popup-closed")?"A entrada com Google foi cancelada antes de concluir.":"Não foi possível concluir a entrada com Google. Tente novamente.");
     }
   }
 
