@@ -176,7 +176,7 @@ function ShopApp() {
     <div className="app">
       <header>
         <a className="brand" onClick={() => setTab("inicio")}>
-          <i>S</i>shop<b>certo</b>
+          <img src="/shopcerto-logo.png" alt="ShopCerto" />
         </a>
         <button className="place" onClick={() => setPreferencesOpen(true)}>
           ⌖ {location}
@@ -587,10 +587,10 @@ export default function App() {
   }
 
   if (currentUser === undefined)
-    return <main className="auth-gate loading"><div className="auth-logo">S</div><p>Cargando ShopCerto…</p></main>;
+    return <main className="auth-gate loading"><div className="auth-logo"><img src="/shopcerto-logo.png" alt="ShopCerto" /></div><p>Carregando ShopCerto…</p></main>;
 
   if (!currentUser)
-    return <main className="auth-gate"><section><div className="auth-brand"><i>S</i><span>shop<b>certo</b></span></div><div className="auth-welcome"><small>AHORRÁ DE FORMA SIMPLE</small><h1>Tu lista de precios,<br/>siempre con vos.</h1><p>Creá una cuenta o iniciá sesión para guardar productos, comparar ofertas y recibir alertas.</p></div><button onClick={enterWithGoogle}><span>G</span>Registrarse o iniciar sesión</button><em>Acceso seguro mediante Google</em>{authError&&<div className="auth-message">{authError}</div>}<footer>Al continuar aceptás nuestros términos y política de privacidad.</footer></section></main>;
+    return <main className="auth-gate"><section><div className="auth-brand"><img src="/shopcerto-logo.png" alt="ShopCerto" /></div><div className="auth-welcome"><small>ECONOMIZE DE FORMA SIMPLES</small><h1>Seus preços,<br/>sempre com você.</h1><p>Entre para guardar produtos, comparar ofertas e receber alertas de preço.</p></div><button onClick={enterWithGoogle}><span>G</span>Entrar ou criar conta</button><em>Acesso seguro com Google</em>{authError&&<div className="auth-message">{authError}</div>}<footer>Ao continuar, você aceita nossos termos e política de privacidade.</footer></section></main>;
 
   return <ShopApp />;
 }
