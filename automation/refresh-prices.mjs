@@ -44,7 +44,7 @@ function structuredProducts(html,base,store){
   for(const heading of html.matchAll(/<h[12][^>]*>([\s\S]*?)<\/h[12]>/gi)){const title=cleanHtml(heading[1]);if(title.length<3)continue;const start=heading.index||0,before=html.slice(Math.max(0,start-3500),start),after=html.slice(start,Math.min(html.length,start+3500)),priceMatch=after.match(/R\$\s*([0-9.]+,[0-9]{2})/i);if(!priceMatch)continue;const links=[...before.matchAll(/<a[^>]+href=["']([^"']+)["']/gi)],link=links.at(-1)?.[1],images=[...before.matchAll(/<img[^>]+(?:src|data-src)=["']([^"']+)["']/gi)],image=images.at(-1)?.[1],price=number(priceMatch[1]);if(Number.isFinite(price)&&price>0)results.push({title,price,currency:"BRL",url:absolute(link,base)||base,imageUrl:absolute(image,base),store})}
   return results;
 }
-async function collect(url,store,query,direct=false){try{const page=await download(url),items=structuredProducts(page.html,page.url,store).filter(item=>item.currency==="BRL"||!item.currency).map(item=>({...item,match:score(query,item.title)}));return items.filter(item=>direct||item.match>=.45)}catch(error){return[{error:`${store}: ${error.message}`,store}]}}
+async function collect(url,store,query,direct=false){try{const page=await download(url),items=structuredProducts(page.html,page.url,store).filter(item=>item.currency==="BRL"||!item.currency).map(item=>({...item,...(direct?{url:page.url}:{}),match:score(query,item.title)}));return items.filter(item=>direct||item.match>=.45)}catch(error){return[{error:`${store}: ${error.message}`,store}]}}
 
 async function updateProduct({userId,productId,requestRef}){
   const productRef=db.doc(`users/${userId}/products/${productId}`),productSnap=await productRef.get();if(!productSnap.exists)return;
